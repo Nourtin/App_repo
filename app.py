@@ -852,44 +852,41 @@ with tab4:
 # ══════════════════════════════════════════════
 
 with tab5:
-    
     st.header("🤖 IA Décisionnelle - Recommandations Intelligentes")
     st.markdown("---")
-    
-    # Récupérer la clé depuis session state ou la demander
-    if "gemini_api_key" not in st.session_state:
-        st.session_state.gemini_api_key = ""
-    
-    api_key = st.text_input(
-        "🔑 Clé API Gemini",
-        value=st.session_state.gemini_api_key,
-        type="password",
-        placeholder="Entrez votre clé API Gemini",
-        help="Obtenez une clé sur https://makersuite.google.com/app/apikey"
-    )
-    
-    if api_key:
-        st.session_state.gemini_api_key = api_key
-    
-    if not api_key:
-        st.warning("⚠️ Veuillez entrer votre clé API Gemini")
-        st.stop()
-    
-    advisor = GeminiAdvisor(api_key=api_key)
-    
-    if not advisor.is_configured:
-        st.error("❌ Clé API invalide. Vérifiez votre clé (doit commencer par 'AIza')")
-        st.stop()
-    
-    st.success("✅ IA Gemini connectée")
-    import google.generativeai as genai
 
-    genai.configure(api_key="AIzaSyCNMlgxYxuST69ZbyEFN33AHoSMVISUWQM")
-    for m in genai.list_models():
-        if "generateContent" in m.supported_generation_methods:
-            print(m.name)
-    
-    # ... reste du code
+    # Initialisation Gemini
+    advisor = GeminiAdvisor()
+    with tab5:
+        st.header("🤖 IA Décisionnelle - Recommandations Intelligentes")
+        st.markdown("---")
+
+        # Saisie de la clé par l'utilisateur
+        api_key_input = st.text_input(
+            "🔑 Entrez votre clé API Gemini",
+            type="password",
+            placeholder="AIza...",
+            help="Obtenez votre clé sur https://aistudio.google.com"
+        )
+
+        if not api_key_input:
+            st.info("👆 Entrez votre clé API Gemini pour activer l'analyse IA")
+            st.stop()
+
+        advisor = GeminiAdvisor(api_key=api_key_input)
+
+        if not advisor.is_configured:
+            st.error("❌ Clé API invalide ou erreur de connexion")
+            st.stop()
+        if st.button("🔍 Voir modèles disponibles"):
+            import google.generativeai as genai
+            genai.configure(api_key=api_key_input)
+            models = genai.list_models()
+            for m in models:
+                if "generateContent" in m.supported_generation_methods:
+                    st.write(f"✅ `{m.name}`")
+        st.success(f"✅ IA Gemini connectée")
+    # ... reste du code identique
 
     # =========================
     # APERÇU DES DONNÉES
