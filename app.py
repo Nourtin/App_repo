@@ -878,13 +878,7 @@ with tab5:
         if not advisor.is_configured:
             st.error("❌ Clé API invalide ou erreur de connexion")
             st.stop()
-        if st.button("🔍 Voir modèles disponibles"):
-            import google.generativeai as genai
-            genai.configure(api_key=api_key_input)
-            models = genai.list_models()
-            for m in models:
-                if "generateContent" in m.supported_generation_methods:
-                    st.write(f"✅ `{m.name}`")
+        
         st.success(f"✅ IA Gemini connectée")
     # ... reste du code identique
 
