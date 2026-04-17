@@ -6,9 +6,15 @@ import json
 import re
 import plotly.graph_objects as go
 import io
+import glob
+import os
+import datetime
+import streamlit as st
 from plotly.subplots import make_subplots
 
-
+import os, glob
+st.write("📁 Dossier courant :", os.getcwd())
+st.write("📂 Fichiers data/ :", glob.glob("data/*"))
 # ─────────────────────────────────────────────
 # FONCTIONS UTILITAIRES
 # ─────────────────────────────────────────────
@@ -1314,14 +1320,10 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
 # ─────────────────────────────────────────────
 
 def render_ats_tab(api_key_input: str = None):
-    """
-    Rendu complet de l'onglet 'Analyse des ATS par IA'.
-    Appelez cette fonction dans votre tab :
-        with tab_ats:
-            render_ats_tab(api_key_input=api_key_input)
-    Si api_key_input est None, le champ de saisie est affiché dans cet onglet.
-    """
     import plotly.express as px
+    import os
+    import glob
+    import datetime
 
     st.header("📋 Analyse des ATS par IA")
     st.markdown("---")
@@ -1337,17 +1339,62 @@ def render_ats_tab(api_key_input: str = None):
         if not api_key_input:
             st.info("👆 Entrez votre clé API Gemini pour activer l'analyse IA")
             st.stop()
-
-    # ── Upload fichiers ───────────────────────
+# ── Upload / Auto fichiers ────────────────
     st.subheader("📤 Importer les fichiers ATS")
-    uploaded_files = st.file_uploader(
-        "Glissez vos fichiers CSV ATS (un ou plusieurs)",
-        type=["csv", "txt"],
-        accept_multiple_files=True,
-        key="ats_files"
-    )
 
-    if not uploaded_files:
+    # Force Streamlit à relire les fichiers à chaque interaction (pas de cache)
+    @st.cache_data(ttl=300)  # Cache de 5 minutes — relit le CSV toutes les 5 min
+    def load_auto_files():
+        files = glob.glob("data/report_*.csv")
+        # Exclut report_latest.csv pour éviter le doublon
+        files = [f for f in files if "latest" not in f]
+        return sorted(files)
+
+    auto_files = load_auto_files()
+
+    # Affiche la dernière mise à jour depuis le fichier last_update.txt
+    if os.path.exists("data/last_update.txt"):
+        with open("data/last_update.txt", "r") as f:
+            last_update_str = f.read().strip()
+        st.caption(f"🕐 Dernière mise à jour GitHub Actions : {last_update_str}")
+
+    if auto_files:
+        st.success(f"✅ {len(auto_files)} fichier(s) chargé(s) automatiquement")
+
+        uploaded_files = st.file_uploader(
+            "Ou ajoutez des fichiers CSV manuellement",
+            type=["csv", "txt"],
+            accept_multiple_files=True,
+            key="ats_files"
+        )
+
+        # Combine auto + manuel
+        all_files = []
+        for f in auto_files:
+            with open(f, "r", encoding="utf-8", errors="replace") as file:
+                content = file.read()
+                all_files.append({"name": os.path.basename(f), "content": content})
+
+        if uploaded_files:
+            for f in uploaded_files:
+                content = f.read().decode("utf-8", errors="replace")
+                all_files.append({"name": f.name, "content": content})
+
+    else:
+        # Aucun fichier auto → upload manuel uniquement
+        uploaded_files = st.file_uploader(
+            "Glissez vos fichiers CSV ATS (un ou plusieurs)",
+            type=["csv", "txt"],
+            accept_multiple_files=True,
+            key="ats_files"
+        )
+        all_files = []
+        if uploaded_files:
+            for f in uploaded_files:
+                content = f.read().decode("utf-8", errors="replace")
+                all_files.append({"name": f.name, "content": content})
+
+    if not all_files:
         st.info("📂 Importez au moins un fichier CSV ATS pour commencer")
         st.stop()
 
@@ -1355,49 +1402,44 @@ def render_ats_tab(api_key_input: str = None):
     all_parsed = []
     all_dfs    = []
 
-    for f in uploaded_files:
+    for f in all_files:
         try:
-            content = f.read().decode("utf-8", errors="replace")
-            parsed  = parse_ats_csv(content, f.name)
-            df_f    = ats_to_dataframe(parsed)
+            parsed = parse_ats_csv(f["content"], f["name"])
+            df_f   = ats_to_dataframe(parsed)
             all_parsed.append(parsed)
             if not df_f.empty:
                 all_dfs.append(df_f)
         except Exception as e:
-            st.warning(f"⚠️ Erreur lecture {f.name} : {e}")
+            st.warning(f"⚠️ Erreur lecture {f['name']} : {e}")
 
-    if not all_parsed:
-        st.error("❌ Aucun fichier valide parsé")
-        st.stop()
-
-    df_all = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
+    # ... reste du code inchangé
 
     # ── Aperçu données ────────────────────────
     with st.expander("📊 Aperçu des données parsées", expanded=True):
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Fichiers chargés", len(all_parsed))
-        col2.metric("Total appels", f"{df_all['Appels'].sum():,}" if not df_all.empty else "0")
+        col2.metric("Total appels", f"{all_dfs['Appels'].sum():,}" if not all_dfs.empty else "0")
         col3.metric("Campagnes",
                     sum(len(p["campaigns"]) for p in all_parsed))
         col4.metric("Listes actives",
-                    len(df_all["Liste"].unique()) if not df_all.empty else 0)
+                    len(all_dfs["Liste"].unique()) if not all_dfs.empty else 0)
 
-        if not df_all.empty:
+        if not all_dfs.empty:
             st.dataframe(
-                df_all.sort_values("Appels", ascending=False),
+                all_dfs.sort_values("Appels", ascending=False),
                 use_container_width=True,
                 height=300
             )
 
     # ── Graphiques rapides ────────────────────
-    if not df_all.empty:
+    if not all_dfs.empty:
         st.markdown("---")
         st.subheader("📈 Visualisation rapide")
 
         col_g1, col_g2 = st.columns(2)
 
         with col_g1:
-            df_disp = (df_all.groupby("Disposition")["Appels"]
+            df_disp = (all_dfs.groupby("Disposition")["Appels"]
                        .sum().reset_index()
                        .sort_values("Appels", ascending=False)
                        .head(10))
@@ -1410,7 +1452,7 @@ def render_ats_tab(api_key_input: str = None):
             st.plotly_chart(fig1, use_container_width=True)
 
         with col_g2:
-            df_liste = (df_all.groupby("Liste")["Appels"]
+            df_liste = (all_dfs.groupby("Liste")["Appels"]
                         .sum().reset_index()
                         .sort_values("Appels", ascending=False)
                         .head(10))
