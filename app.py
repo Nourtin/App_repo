@@ -1104,31 +1104,18 @@ with tab5:
     st.header("🤖 IA Décisionnelle - Recommandations Intelligentes")
     st.markdown("---")
 
-    if not api_key_input:
-        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer l'analyse IA")
-        st.stop()
-
-    advisor = GeminiAdvisor(api_key=api_key_input)
-
-    if not advisor.is_configured:
-        st.error("❌ Clé API invalide ou erreur de connexion")
-        st.stop()        
-        st.success(f"✅ IA Gemini connectée")
     # =========================
     # APERÇU DES DONNÉES
     # =========================
     with st.expander("📊 Aperçu des données", expanded=False):
         col1, col2, col3 = st.columns(3)
-
         with col1:
             st.metric("Total appels", f"{len(df):,}")
-
         with col2:
             if "list_name" in df.columns:
                 st.metric("Fournisseurs", df["list_name"].nunique())
             else:
                 st.metric("Fournisseurs", "N/A")
-
         with col3:
             if "tipo_vivienda" in df.columns:
                 st.metric("Types logement", df["tipo_vivienda"].nunique())
@@ -1138,7 +1125,7 @@ with tab5:
     st.markdown("---")
 
     # =========================
-    # BOUTON ANALYSE
+    # BOUTON ANALYSE (clé requise ici seulement)
     # =========================
     col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 
@@ -1146,21 +1133,34 @@ with tab5:
         analyse_btn = st.button(
             "🔮 LANCER L'ANALYSE IA",
             type="primary",
-            use_container_width=True
+            use_container_width=True,
+            disabled=not api_key_input  # ← désactivé si pas de clé
         )
 
-    if analyse_btn:
-        with st.spinner("🤖 Gemini analyse vos données..."):
-            resultat = advisor.analyser_tous_les_volets(df)
+    if not api_key_input:
+        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer l'analyse IA")
 
-        if resultat:
-            st.balloons()
-            st.success("✅ Analyse terminée !")
-            st.session_state.analyse_ia_resultat = resultat
+    if analyse_btn and api_key_input:
+        advisor = GeminiAdvisor(api_key=api_key_input)
+
+        if not advisor.is_configured:
+            st.error("❌ Clé API invalide ou erreur de connexion")
         else:
-            st.error("❌ Échec de l'analyse")
+            st.success("✅ IA Gemini connectée")
+            with st.spinner("🤖 Gemini analyse vos données..."):
+                resultat = advisor.analyser_tous_les_volets(df)
+
+            if resultat:
+                st.balloons()
+                st.success("✅ Analyse terminée !")
+                st.session_state.analyse_ia_resultat = resultat
+            else:
+                st.error("❌ Échec de l'analyse")
 
     st.markdown("---")
+
+    # Le reste du code (sous-onglets, export...) reste identique
+    # Il s'affiche toujours, clé ou pas
 
     # =========================
     # SOUS-ONGLETS

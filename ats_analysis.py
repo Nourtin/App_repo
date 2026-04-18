@@ -6,14 +6,9 @@ import json
 import re
 import plotly.graph_objects as go
 import plotly.express as px
-import io
 import glob
 import os
-import datetime
 from plotly.subplots import make_subplots
-
-st.write("📁 Dossier courant :", os.getcwd())
-st.write("📂 Fichiers data/ :", glob.glob("data/*"))
 
 # ─────────────────────────────────────────────
 # FONCTIONS UTILITAIRES
@@ -203,13 +198,13 @@ def analyze_ats_performance(all_parsed: list) -> dict:
                     if any(x in disp_name for x in DISPO_CONTACT):
                         compteurs["contact"] += calls
 
-                taux_xfer         = round((compteurs["xfer"] / total_calls) * 100, 2)
-                base_hors_pdrop   = total_calls - compteurs["pdrop"]
+                taux_xfer            = round((compteurs["xfer"] / total_calls) * 100, 2)
+                base_hors_pdrop      = total_calls - compteurs["pdrop"]
                 taux_xfer_hors_pdrop = round((compteurs["xfer"] / base_hors_pdrop) * 100, 2) if base_hors_pdrop > 0 else 0
-                taux_aa           = round((compteurs["aa"]      / total_calls) * 100, 2)
-                taux_na           = round((compteurs["na"]      / total_calls) * 100, 2)
-                taux_adc          = round((compteurs["adc"]     / total_calls) * 100, 2)
-                taux_contact      = round((compteurs["contact"] / total_calls) * 100, 2)
+                taux_aa              = round((compteurs["aa"]      / total_calls) * 100, 2)
+                taux_na              = round((compteurs["na"]      / total_calls) * 100, 2)
+                taux_adc             = round((compteurs["adc"]     / total_calls) * 100, 2)
+                taux_contact         = round((compteurs["contact"] / total_calls) * 100, 2)
 
                 perf_liste = {
                     "fichier": filename, "campagne": campaign_name,
@@ -353,9 +348,9 @@ def analyze_amd_performance(all_parsed: list) -> dict:
 
     if amd_stats["total_appels"] > 0:
         t = amd_stats["total_appels"]
-        amd_stats["taux_short_calls"]    = round((amd_stats["total_short_calls"]      / t) * 100, 2)
-        amd_stats["taux_faux_positifs"]  = round((amd_stats["faux_positifs_estimes"]  / t) * 100, 2)
-        amd_stats["taux_faux_negatifs"]  = round((amd_stats["faux_negatifs_estimes"]  / t) * 100, 2)
+        amd_stats["taux_short_calls"]   = round((amd_stats["total_short_calls"]     / t) * 100, 2)
+        amd_stats["taux_faux_positifs"] = round((amd_stats["faux_positifs_estimes"] / t) * 100, 2)
+        amd_stats["taux_faux_negatifs"] = round((amd_stats["faux_negatifs_estimes"] / t) * 100, 2)
         total_det = amd_stats["total_aa_detectes"] + amd_stats["total_humains_detectes"]
         if total_det > 0:
             erreurs = amd_stats["faux_positifs_estimes"] + amd_stats["faux_negatifs_estimes"]
@@ -392,12 +387,12 @@ def analyze_time_slots(all_parsed: list) -> dict:
 
     time_slots = {
         "creneaux": [
-            {"nom": "Matin (8h-10h)",          "contact": 0, "total": 0, "taux": 0},
-            {"nom": "Matinée (10h-12h)",        "contact": 0, "total": 0, "taux": 0},
-            {"nom": "Midi (12h-14h)",           "contact": 0, "total": 0, "taux": 0},
-            {"nom": "Après-midi (14h-17h)",     "contact": 0, "total": 0, "taux": 0},
-            {"nom": "Soirée (17h-20h)",         "contact": 0, "total": 0, "taux": 0},
-            {"nom": "Soir (20h-21h)",           "contact": 0, "total": 0, "taux": 0}
+            {"nom": "Matin (8h-10h)",       "contact": 0, "total": 0, "taux": 0},
+            {"nom": "Matinée (10h-12h)",     "contact": 0, "total": 0, "taux": 0},
+            {"nom": "Midi (12h-14h)",        "contact": 0, "total": 0, "taux": 0},
+            {"nom": "Après-midi (14h-17h)",  "contact": 0, "total": 0, "taux": 0},
+            {"nom": "Soirée (17h-20h)",      "contact": 0, "total": 0, "taux": 0},
+            {"nom": "Soir (20h-21h)",        "contact": 0, "total": 0, "taux": 0}
         ],
         "meilleur_creneau": None, "pire_creneau": None,
         "recommandations_horaires": [], "heatmap_data": []
@@ -615,10 +610,10 @@ def display_advanced_ats_analysis(all_parsed: list):
                 st.plotly_chart(fig, use_container_width=True)
             with col2:
                 st.markdown("### Statistiques")
-                st.metric("Moyenne",  f"{df_xfer['taux_xfer_hors_pdrop'].mean():.2f}%")
-                st.metric("Médiane",  f"{df_xfer['taux_xfer_hors_pdrop'].median():.2f}%")
-                st.metric("Maximum",  f"{df_xfer['taux_xfer_hors_pdrop'].max():.2f}%")
-                st.metric("Minimum",  f"{df_xfer['taux_xfer_hors_pdrop'].min():.2f}%")
+                st.metric("Moyenne", f"{df_xfer['taux_xfer_hors_pdrop'].mean():.2f}%")
+                st.metric("Médiane", f"{df_xfer['taux_xfer_hors_pdrop'].median():.2f}%")
+                st.metric("Maximum", f"{df_xfer['taux_xfer_hors_pdrop'].max():.2f}%")
+                st.metric("Minimum", f"{df_xfer['taux_xfer_hors_pdrop'].min():.2f}%")
 
             st.markdown("### Classement complet")
             df_xfer_display = df_xfer.copy()
@@ -700,8 +695,8 @@ def display_advanced_ats_analysis(all_parsed: list):
                                      line=dict(color="green", width=2), marker=dict(size=8)),
                           secondary_y=True)
             fig.update_layout(barmode="stack", xaxis_title="ID Liste", hovermode="x unified")
-            fig.update_yaxes(title_text="Nombre d'appels",        secondary_y=False)
-            fig.update_yaxes(title_text="Taux de recyclage (%)",  secondary_y=True)
+            fig.update_yaxes(title_text="Nombre d'appels",       secondary_y=False)
+            fig.update_yaxes(title_text="Taux de recyclage (%)", secondary_y=True)
             st.plotly_chart(fig, use_container_width=True)
 
             df_rec_display = df_rec.copy()
@@ -754,9 +749,9 @@ def display_advanced_insights(all_parsed: list):
                     'axis': {'range': [0, 100]},
                     'bar': {'color': "darkblue"},
                     'steps': [
-                        {'range': [0, 70],  'color': "red"},
-                        {'range': [70, 85], 'color': "orange"},
-                        {'range': [85, 100],'color': "green"}
+                        {'range': [0, 70],   'color': "red"},
+                        {'range': [70, 85],  'color': "orange"},
+                        {'range': [85, 100], 'color': "green"}
                     ],
                     'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': 90}
                 }
@@ -803,8 +798,8 @@ def display_advanced_insights(all_parsed: list):
                           secondary_y=True)
             fig.update_layout(title="Performance par créneau horaire (estimation)",
                               barmode='group', hovermode='x unified', height=400)
-            fig.update_yaxes(title_text="Nombre d'appels",       secondary_y=False)
-            fig.update_yaxes(title_text="Taux de contact (%)",   secondary_y=True)
+            fig.update_yaxes(title_text="Nombre d'appels",     secondary_y=False)
+            fig.update_yaxes(title_text="Taux de contact (%)", secondary_y=True)
             st.plotly_chart(fig, use_container_width=True)
 
     with tab_quality:
@@ -962,18 +957,12 @@ def render_ats_tab(api_key_input: str = None):
     st.header("📋 Analyse des ATS par IA")
     st.markdown("---")
 
-    # ── Clé API ──────────────────────────────
+    # ── Clé API : vient du sidebar d'app.py ──
     if not api_key_input:
-        api_key_input = st.text_input(
-            "🔑 Clé API Gemini", type="password",
-            placeholder="AIza...", key="ats_api_key"
-        )
-        if not api_key_input:
-            st.info("👆 Entrez votre clé API Gemini pour activer l'analyse IA")
-            st.stop()
+        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer l'analyse IA")
 
-    # ── Chargement auto des fichiers ─────────
-    st.subheader("📤 Importer les fichiers ATS")
+    # ── Chargement des fichiers ───────────────
+    st.subheader("📤 Sélectionner les fichiers ATS")
 
     @st.cache_data(ttl=300)
     def load_auto_files():
@@ -990,15 +979,33 @@ def render_ats_tab(api_key_input: str = None):
 
     all_files = []
 
+    # ── Menu déroulant des fichiers du repo ──
     if auto_files:
-        st.success(f"✅ {len(auto_files)} fichier(s) chargé(s) automatiquement")
-        for f in auto_files:
-            with open(f, "r", encoding="utf-8", errors="replace") as file:
-                content = file.read()
-                all_files.append({"name": os.path.basename(f), "content": content})
+        noms_fichiers = [os.path.basename(f) for f in auto_files]
 
+        fichiers_selectionnes = st.multiselect(
+            "📁 Fichiers disponibles (repo GitHub)",
+            options=noms_fichiers,
+            default=noms_fichiers,
+            placeholder="Choisissez un ou plusieurs fichiers..."
+        )
+
+        for f in auto_files:
+            if os.path.basename(f) in fichiers_selectionnes:
+                with open(f, "r", encoding="utf-8", errors="replace") as file:
+                    content = file.read()
+                    all_files.append({"name": os.path.basename(f), "content": content})
+
+        if fichiers_selectionnes:
+            st.success(f"✅ {len(fichiers_selectionnes)} fichier(s) sélectionné(s)")
+        else:
+            st.warning("⚠️ Aucun fichier sélectionné")
+    else:
+        st.info("📭 Aucun fichier trouvé dans le repo (data/report_*.csv)")
+
+    # ── Upload manuel en complément ──────────
     uploaded_files = st.file_uploader(
-        "Ou ajoutez des fichiers CSV manuellement" if auto_files else "Glissez vos fichiers CSV ATS",
+        "➕ Ajouter des fichiers CSV manuellement",
         type=["csv", "txt"],
         accept_multiple_files=True,
         key="ats_files"
@@ -1010,7 +1017,7 @@ def render_ats_tab(api_key_input: str = None):
             all_files.append({"name": f.name, "content": content})
 
     if not all_files:
-        st.info("📂 Importez au moins un fichier CSV ATS pour commencer")
+        st.info("📂 Sélectionnez ou importez au moins un fichier CSV ATS pour commencer")
         st.stop()
 
     # ── Parsing ───────────────────────────────
@@ -1027,7 +1034,6 @@ def render_ats_tab(api_key_input: str = None):
         except Exception as e:
             st.warning(f"⚠️ Erreur lecture {f['name']} : {e}")
 
-    # ✅ FIX PRINCIPAL : concat ici
     df_combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
     # ── Aperçu données ────────────────────────
@@ -1085,8 +1091,10 @@ def render_ats_tab(api_key_input: str = None):
     with col_b2:
         analyse_btn = st.button(
             "🤖 ANALYSER AVEC GEMINI",
-            type="primary", use_container_width=True,
-            key="ats_analyse_btn"
+            type="primary",
+            use_container_width=True,
+            key="ats_analyse_btn",
+            disabled=not api_key_input  # désactivé si pas de clé
         )
 
     if analyse_btn:
