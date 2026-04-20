@@ -68,7 +68,7 @@ with st.sidebar:
             try:
                 with st.spinner("Chargement du fichier..."):
                     st.session_state.fichier, st.session_state.sheets_list = list_sheets(sheet_url)
-                    st.success(f"✅ {len(st.session_state.sheets_list)} feuille(s) trouvée(s)")
+                    st.success(f" {len(st.session_state.sheets_list)} feuille(s) trouvée(s)")
             except Exception as e:
                 st.error(f"Erreur de chargement: {str(e)}")
                 st.session_state.fichier = None
@@ -83,10 +83,10 @@ with st.sidebar:
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("✅ Tout sélectionner", use_container_width=True):
+            if st.button(" Tout sélectionner", use_container_width=True):
                 st.session_state.selected_sheets = st.session_state.sheets_list.copy()
         with col2:
-            if st.button("❌ Effacer tout", use_container_width=True):
+            if st.button(" Effacer tout", use_container_width=True):
                 st.session_state.selected_sheets = []
                 st.rerun()
         
@@ -136,7 +136,7 @@ with st.sidebar:
                         
                         status_text.empty()
                         progress_bar.empty()
-                        st.success(f"✅ Données chargées : {len(st.session_state.df_raw):,} lignes depuis {len(selected_sheets)} feuille(s)")
+                        st.success(f" Données chargées : {len(st.session_state.df_raw):,} lignes depuis {len(selected_sheets)} feuille(s)")
                         
                         with st.expander("📋 Détail du chargement"):
                             st.write(f"**Total lignes :** {len(st.session_state.df_raw):,}")
@@ -150,12 +150,12 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"Erreur lors du chargement des données: {str(e)}")
         else:
-            st.warning("⚠️ Veuillez sélectionner au moins une feuille")
+            st.warning(" Veuillez sélectionner au moins une feuille")
     
     # Afficher les filtres seulement si les données sont chargées
     if st.session_state.df_raw is not None:
         st.markdown("---")
-        st.subheader("🎯 Filtres")
+        st.subheader(" Filtres")
         
         df_raw = st.session_state.df_raw
         
@@ -165,7 +165,7 @@ with st.sidebar:
             fourn_sel = st.selectbox("Fournisseur (list_name)", fournisseurs)
         else:
             fourn_sel = "Tous"
-            st.caption("⚠️ Colonne 'list_name' non trouvée")
+            st.caption(" Colonne 'list_name' non trouvée")
         
         # Filtre date
         if "Timestamp" in df_raw.columns:
@@ -184,7 +184,7 @@ with st.sidebar:
                 date_range = None
         else:
             date_range = None
-            st.caption("⚠️ Colonne 'Timestamp' non trouvée")
+            st.caption(" Colonne 'Timestamp' non trouvée")
         
         st.markdown("---")
         if st.button("🔄 Actualiser"):
@@ -219,7 +219,7 @@ if date_range is not None and "Timestamp" in df.columns:
         df = df[(ts.dt.date >= date_range[0]) & (ts.dt.date <= date_range[1])]
 
 if df.empty:
-    st.warning("⚠️ Aucune donnée pour les filtres sélectionnés.")
+    st.warning(" Aucune donnée pour les filtres sélectionnés.")
     st.stop()
 
 # ─────────────────────────────────────────────
@@ -231,7 +231,7 @@ tab1, tab2, tab3, tab4, tab5, tab_ats = st.tabs([
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
     "🏠 Logements",
-    "🤖 AI Recommendations",
+    " AI Recommendations",
     "📋 Analyse des ATS par IA"   # ← nouveau
 ])
 
@@ -396,7 +396,7 @@ with tab2:
             st.plotly_chart(fig, use_container_width=True)
 
         with col_b:
-            st.subheader("🎯 Taux d'appels qualifiés (%)")
+            st.subheader(" Taux d'appels qualifiés (%)")
             fig = px.bar(
                 df_fourn.sort_values("taux_qualifies_pct"),
                 x="taux_qualifies_pct", y="list_name",
@@ -577,7 +577,7 @@ with tab2:
                         st.dataframe(df_cross, use_container_width=True)
                 
                 # Graphique 3: Analyse des classifications par type de logement
-                st.subheader("🎯 Classification des appels par type de logement")
+                st.subheader(" Classification des appels par type de logement")
                 
                 if "Classification" in df.columns:
                     # Filtrer les classifications utiles
@@ -668,7 +668,7 @@ with tab3:
             st.warning("Colonnes 'code_postal' et/ou 'codigo_postal' non trouvées")
     
     with col2:
-        st.subheader("🎯 Comparaison Client vs Fournisseur")
+        st.subheader(" Comparaison Client vs Fournisseur")
         
         df_comp, stats = comparer_codes_postaux(df)
         
@@ -678,11 +678,11 @@ with tab3:
             st.metric("Taux de correspondance", f"{stats['taux_correspondance']}%")
             
             if stats['taux_correspondance'] >= 80:
-                st.success(f"✅ Bonne fiabilité : {stats['taux_correspondance']}%")
+                st.success(f" Bonne fiabilité : {stats['taux_correspondance']}%")
             elif stats['taux_correspondance'] >= 50:
-                st.warning(f"⚠️ Fiabilité moyenne : {stats['taux_correspondance']}%")
+                st.warning(f" Fiabilité moyenne : {stats['taux_correspondance']}%")
             else:
-                st.error(f"❌ Faible fiabilité : {stats['taux_correspondance']}%")
+                st.error(f" Faible fiabilité : {stats['taux_correspondance']}%")
         else:
             st.info("Pas assez de données pour comparer les codes postaux")
     
@@ -769,7 +769,7 @@ with tab3:
             mime="text/csv",
         )
     else:
-        st.success("✅ Tous les codes postaux disponibles correspondent !")
+        st.success(" Tous les codes postaux disponibles correspondent !")
 
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
@@ -784,7 +784,7 @@ with tab4:
     
     # Vérifier si la colonne existe
     if "piso_casa" not in df.columns:
-        st.warning("⚠️ Colonne 'piso_casa' non trouvée dans les données")
+        st.warning(" Colonne 'piso_casa' non trouvée dans les données")
         st.info("Ajoutez une colonne 'piso_casa' pour analyser les types de logement")
     else:
         # =========================================================
@@ -814,7 +814,7 @@ with tab4:
                 with col_m4:
                     pire_type = df_comparaison.loc[df_comparaison["taux_qualifies"].idxmin(), "type_logement"]
                     pire_taux = df_comparaison["taux_qualifies"].min()
-                    st.metric("⚠️ Plus faible", f"{pire_taux}%", pire_type)
+                    st.metric(" Plus faible", f"{pire_taux}%", pire_type)
                 
                 st.markdown("---")
                 
@@ -1017,7 +1017,7 @@ with tab4:
             
             with col_i1:
                 st.success(f"""
-                **✅ Points forts**  
+                ** Points forts**  
                 - Le type **{meilleur['type_logement']}** a le meilleur taux de qualification ({meilleur['taux_qualifies']}%)
                 - Il représente {meilleur['total_appels']} appels au total
                 """)
@@ -1025,15 +1025,15 @@ with tab4:
             with col_i2:
                 if pire['taux_qualifies'] < 20:
                     st.warning(f"""
-                    **⚠️ Points d'attention**  
+                    ** Points d'attention**  
                     - Le type **{pire['type_logement']}** a un faible taux de qualification ({pire['taux_qualifies']}%)
                     - Seulement {pire['appels_qualifies']} appels qualifiés sur {pire['total_appels']}
                     """)
                 else:
-                    st.info(f"✅ Tous les types ont un taux de qualification acceptable (>20%)")
+                    st.info(f" Tous les types ont un taux de qualification acceptable (>20%)")
         
         st.info("""
-        **🎯 Recommandations stratégiques :**
+        ** Recommandations stratégiques :**
         1. **Prioriser les types qui qualifient le mieux** pour les campagnes marketing
         2. **Analyser les classifications** des types moins performants pour comprendre les freins
         3. **Adapter le discours commercial** selon le type de logement
@@ -1101,123 +1101,124 @@ api_key_input = st.sidebar.text_input(
 
 # ── Dans tab5 ───────────────────────────────
 with tab5:
-    st.header("🤖 IA Décisionnelle - Recommandations Intelligentes")
+    st.header(" IA Décisionnelle - Recommandations Intelligentes")
     st.markdown("---")
 
     # =========================
-    # APERÇU DES DONNÉES
+    # APERÇU DES DONNÉES (toujours visible)
     # =========================
     with st.expander("📊 Aperçu des données", expanded=False):
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Total appels", f"{len(df):,}")
         with col2:
-            if "list_name" in df.columns:
-                st.metric("Fournisseurs", df["list_name"].nunique())
-            else:
-                st.metric("Fournisseurs", "N/A")
+            st.metric("Fournisseurs", df["list_name"].nunique() if "list_name" in df.columns else "N/A")
         with col3:
-            if "tipo_vivienda" in df.columns:
-                st.metric("Types logement", df["tipo_vivienda"].nunique())
-            else:
-                st.metric("Types logement", "N/A")
+            st.metric("Types logement", df["tipo_vivienda"].nunique() if "tipo_vivienda" in df.columns else "N/A")
 
     st.markdown("---")
 
     # =========================
-    # BOUTON ANALYSE (clé requise ici seulement)
+    # BOUTON ANALYSE IA (clé requise ici seulement)
     # =========================
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    if not api_key_input:
+        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer les recommandations IA")
 
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
     with col_btn2:
         analyse_btn = st.button(
             "🔮 LANCER L'ANALYSE IA",
             type="primary",
             use_container_width=True,
-            disabled=not api_key_input  # ← désactivé si pas de clé
+            disabled=not api_key_input
         )
 
-    if not api_key_input:
-        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer l'analyse IA")
-
-    if analyse_btn and api_key_input:
+    if analyse_btn:
         advisor = GeminiAdvisor(api_key=api_key_input)
-
         if not advisor.is_configured:
-            st.error("❌ Clé API invalide ou erreur de connexion")
+            st.error(" Clé API invalide ou erreur de connexion")
         else:
-            st.success("✅ IA Gemini connectée")
-            with st.spinner("🤖 Gemini analyse vos données..."):
+            st.success(" IA Gemini connectée")
+            with st.spinner(" Gemini analyse vos données..."):
                 resultat = advisor.analyser_tous_les_volets(df)
-
             if resultat:
                 st.balloons()
-                st.success("✅ Analyse terminée !")
+                st.success(" Analyse terminée !")
                 st.session_state.analyse_ia_resultat = resultat
             else:
-                st.error("❌ Échec de l'analyse")
+                st.error(" Échec de l'analyse")
 
     st.markdown("---")
-
-    # Le reste du code (sous-onglets, export...) reste identique
-    # Il s'affiche toujours, clé ou pas
 
     # =========================
     # SOUS-ONGLETS
     # =========================
     sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-        "⏰ Analyse Horaires",
-        "🏢 Analyse Fournisseurs",
-        "🏠 Analyse Logements"
+        " Analyse Horaires",
+        "Analyse Fournisseurs",
+        "Analyse Logements"
     ])
 
     # =========================
     # TAB 1 : HORAIRES
     # =========================
     with sub_tab1:
-        st.subheader("⏰ Analyse des horaires")
+        st.subheader(" Analyse des horaires")
 
+        # ── Données brutes depuis df (toujours visible) ──
+        df_h_raw = appels_par_heure(df)
+
+        if not df_h_raw.empty:
+            col_h1, col_h2, col_h3 = st.columns(3)
+            with col_h1:
+                best = df_h_raw.loc[df_h_raw["nb_appels"].idxmax(), "heure"]
+                st.metric("📞 Heure de pointe", f"{best}h")
+            with col_h2:
+                st.metric("Total appels", f"{df_h_raw['nb_appels'].sum():,}")
+            with col_h3:
+                actifs = df_h_raw[df_h_raw["nb_appels"] > 0]
+                st.metric("Créneaux actifs", len(actifs))
+
+            fig = px.line(df_h_raw, x="heure", y="nb_appels", markers=True,
+                          title="Appels par heure de la journée")
+            fig.add_vline(x=best, line_dash="dash", line_color="green",
+                          annotation_text="Heure de pointe")
+            fig.add_hline(y=df_h_raw["nb_appels"].mean(), line_dash="dash", line_color="red",
+                          annotation_text="Moyenne")
+            fig.update_layout(xaxis=dict(tickmode="linear", tick0=0, dtick=1))
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(df_h_raw, use_container_width=True, hide_index=True)
+        else:
+            st.warning(" Impossible de calculer les appels par heure")
+
+        # ── Recommandations IA (uniquement si analyse lancée) ──
         if "analyse_ia_resultat" in st.session_state:
             resultat = st.session_state.analyse_ia_resultat
-
             if "analyse_horaire" in resultat:
                 h = resultat["analyse_horaire"]
-
+                st.markdown("---")
+                st.subheader(" Recommandations IA")
                 col_h1, col_h2, col_h3 = st.columns(3)
-
                 with col_h1:
                     st.metric("🏆 Meilleure heure", f"{h.get('meilleure_heure', 'N/A')}h")
-
                 with col_h2:
                     st.metric("📊 Taux à cette heure", f"{h.get('meilleur_taux', 0)}%")
-
                 with col_h3:
                     st.metric("📞 Heure max appels", f"{h.get('heure_plus_appels', 'N/A')}h")
 
                 if "performance_par_heure" in h:
-                    df_h = pd.DataFrame([
+                    df_h_ia = pd.DataFrame([
                         {"heure": heur, "taux": d.get("taux", 0)}
                         for heur, d in h["performance_par_heure"].items()
                     ])
-
-                    if not df_h.empty:
-                        fig = px.line(
-                            df_h,
-                            x="heure",
-                            y="taux",
-                            markers=True,
-                            title="Taux par heure"
-                        )
+                    if not df_h_ia.empty:
+                        fig = px.line(df_h_ia, x="heure", y="taux", markers=True,
+                                      title="Taux de classification par heure (IA)")
                         fig.add_hline(y=50, line_dash="dash", line_color="red")
                         st.plotly_chart(fig, use_container_width=True)
 
-                if "recommandations" in resultat and "horaires" in resultat["recommandations"]:
-                    st.markdown("---")
-                    st.info(f"💡 {resultat['recommandations']['horaires']}")
-            else:
-                st.info("Données horaires disponibles")
-        else:
-            st.info("📊 Lancez l'analyse")
+            if "recommandations" in resultat and "horaires" in resultat["recommandations"]:
+                st.info(f"💡 {resultat['recommandations']['horaires']}")
 
     # =========================
     # TAB 2 : FOURNISSEURS
@@ -1225,48 +1226,68 @@ with tab5:
     with sub_tab2:
         st.subheader("🏢 Analyse fournisseurs")
 
+        # ── Données brutes depuis df (toujours visible) ──
+        if "list_name" in df.columns:
+            df_f_raw = (
+                df.groupby("list_name")
+                .size()
+                .reset_index(name="appels")
+                .sort_values("appels", ascending=False)
+            )
+            df_f_raw["part_%"] = (df_f_raw["appels"] / df_f_raw["appels"].sum() * 100).round(2)
+
+            col_f1, col_f2, col_f3 = st.columns(3)
+            with col_f1:
+                st.metric("Nombre fournisseurs", len(df_f_raw))
+            with col_f2:
+                st.metric("🏆 Fournisseur principal", df_f_raw.iloc[0]["list_name"])
+            with col_f3:
+                st.metric("Total appels", f"{df_f_raw['appels'].sum():,}")
+
+            st.dataframe(df_f_raw, use_container_width=True, hide_index=True)
+
+            fig = px.bar(
+                df_f_raw.sort_values("appels"),
+                x="appels", y="list_name", orientation="h",
+                color="appels", color_continuous_scale="Blues",
+                title="Appels par fournisseur"
+            )
+            fig.update_layout(showlegend=False)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning(" Colonne 'list_name' non trouvée dans les données")
+
+        # ── Recommandations IA (uniquement si analyse lancée) ──
         if "analyse_ia_resultat" in st.session_state:
             resultat = st.session_state.analyse_ia_resultat
-
             if "analyse_fournisseurs" in resultat:
-                df_f = pd.DataFrame(resultat["analyse_fournisseurs"])
-
-                if not df_f.empty:
+                df_f_ia = pd.DataFrame(resultat["analyse_fournisseurs"])
+                if not df_f_ia.empty:
+                    st.markdown("---")
+                    st.subheader(" Recommandations IA")
                     col_f1, col_f2, col_f3 = st.columns(3)
-
                     with col_f1:
-                        st.metric("Nombre fournisseurs", len(df_f))
-
+                        st.metric("Fournisseurs analysés", len(df_f_ia))
                     with col_f2:
-                        meilleur = df_f.loc[df_f["taux_classification"].idxmax()]
+                        meilleur = df_f_ia.loc[df_f_ia["taux_classification"].idxmax()]
                         st.metric("🏆 Meilleur taux", f"{meilleur['taux_classification']}%", meilleur['nom'])
-
                     with col_f3:
-                        pire = df_f.loc[df_f["taux_classification"].idxmin()]
-                        st.metric("⚠️ À améliorer", f"{pire['taux_classification']}%", pire['nom'])
+                        pire = df_f_ia.loc[df_f_ia["taux_classification"].idxmin()]
+                        st.metric(" À améliorer", f"{pire['taux_classification']}%", pire['nom'])
 
                     st.dataframe(
-                        df_f.sort_values("taux_classification", ascending=False),
+                        df_f_ia.sort_values("taux_classification", ascending=False),
                         use_container_width=True
                     )
-
                     fig = px.bar(
-                        df_f.sort_values("taux_classification"),
-                        x="taux_classification",
-                        y="nom",
-                        orientation="h",
-                        color="taux_classification",
-                        color_continuous_scale="RdYlGn"
+                        df_f_ia.sort_values("taux_classification"),
+                        x="taux_classification", y="nom", orientation="h",
+                        color="taux_classification", color_continuous_scale="RdYlGn"
                     )
                     st.plotly_chart(fig, use_container_width=True)
 
-                    if "recommandations" in resultat and "fournisseurs" in resultat["recommandations"]:
-                        st.markdown("---")
-                        st.success(f"💡 {resultat['recommandations']['fournisseurs']}")
-            else:
-                st.info("Données fournisseurs disponibles")
-        else:
-            st.info("📊 Lancez l'analyse")
+            if "recommandations" in resultat and "fournisseurs" in resultat["recommandations"]:
+                st.success(f"💡 {resultat['recommandations']['fournisseurs']}")
 
     # =========================
     # TAB 3 : LOGEMENTS
@@ -1274,99 +1295,119 @@ with tab5:
     with sub_tab3:
         st.subheader("🏠 Analyse logements")
 
+        # ── Données brutes depuis df (toujours visible) ──
+        if "tipo_vivienda" in df.columns:
+            df_l_raw = (
+                df.groupby("tipo_vivienda")
+                .size()
+                .reset_index(name="appels")
+                .rename(columns={"tipo_vivienda": "type"})
+                .sort_values("appels", ascending=False)
+            )
+            df_l_raw["part_%"] = (df_l_raw["appels"] / df_l_raw["appels"].sum() * 100).round(2)
+
+            col_l1, col_l2, col_l3 = st.columns(3)
+            with col_l1:
+                st.metric("Types logement", len(df_l_raw))
+            with col_l2:
+                st.metric("🏆 Type principal", df_l_raw.iloc[0]["type"])
+            with col_l3:
+                st.metric("Total appels", f"{df_l_raw['appels'].sum():,}")
+
+            st.dataframe(df_l_raw, use_container_width=True, hide_index=True)
+
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                fig = px.bar(
+                    df_l_raw.head(10).sort_values("appels"),
+                    x="appels", y="type", orientation="h",
+                    color="appels", color_continuous_scale="Greens",
+                    title="Top 10 - Appels par type logement"
+                )
+                fig.update_layout(showlegend=False)
+                st.plotly_chart(fig, use_container_width=True)
+            with col_g2:
+                fig2 = px.pie(
+                    df_l_raw.head(10),
+                    values="appels", names="type",
+                    title="Répartition par type logement"
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.warning(" Colonne 'tipo_vivienda' non trouvée dans les données")
+
+        # ── Recommandations IA (uniquement si analyse lancée) ──
         if "analyse_ia_resultat" in st.session_state:
             resultat = st.session_state.analyse_ia_resultat
-
             if "analyse_logements" in resultat:
-                df_l = pd.DataFrame(resultat["analyse_logements"])
-
-                if not df_l.empty:
+                df_l_ia = pd.DataFrame(resultat["analyse_logements"])
+                if not df_l_ia.empty:
+                    st.markdown("---")
+                    st.subheader(" Recommandations IA")
                     col_l1, col_l2, col_l3 = st.columns(3)
-
                     with col_l1:
-                        st.metric("Types logement", len(df_l))
-
+                        st.metric("Types analysés", len(df_l_ia))
                     with col_l2:
-                        meilleur = df_l.loc[df_l["taux_classification"].idxmax()]
+                        meilleur = df_l_ia.loc[df_l_ia["taux_classification"].idxmax()]
                         st.metric("🏆 Top performance", f"{meilleur['taux_classification']}%", meilleur['type'])
-
                     with col_l3:
-                        total_appels = df_l["appels"].sum()
-                        st.metric("Total appels", f"{total_appels:,}")
+                        st.metric("Total appels", f"{df_l_ia['appels'].sum():,}")
 
                     st.dataframe(
-                        df_l.sort_values("taux_classification", ascending=False),
+                        df_l_ia.sort_values("taux_classification", ascending=False),
                         use_container_width=True
                     )
-
                     col_g1, col_g2 = st.columns(2)
-
                     with col_g1:
                         fig = px.bar(
-                            df_l.head(10),
-                            x="taux_classification",
-                            y="type",
-                            orientation="h",
-                            color="taux_classification",
-                            color_continuous_scale="Greens"
+                            df_l_ia.head(10),
+                            x="taux_classification", y="type", orientation="h",
+                            color="taux_classification", color_continuous_scale="Greens"
                         )
                         st.plotly_chart(fig, use_container_width=True)
-
                     with col_g2:
                         fig2 = px.bar(
-                            df_l.head(10),
-                            x="appels",
-                            y="type",
-                            orientation="h",
-                            color="appels",
-                            color_continuous_scale="Blues"
+                            df_l_ia.head(10),
+                            x="appels", y="type", orientation="h",
+                            color="appels", color_continuous_scale="Blues"
                         )
                         st.plotly_chart(fig2, use_container_width=True)
 
-                    if "recommandations" in resultat and "logements" in resultat["recommandations"]:
-                        st.markdown("---")
-                        st.info(f"💡 {resultat['recommandations']['logements']}")
-            else:
-                st.info("Données logements disponibles")
-        else:
-            st.info("📊 Lancez l'analyse")
+            if "recommandations" in resultat and "logements" in resultat["recommandations"]:
+                st.info(f"💡 {resultat['recommandations']['logements']}")
 
     # =========================
-    # EXPORT + PRÉDICTION
+    # EXPORT + PRÉDICTION (uniquement si analyse lancée)
     # =========================
     if "analyse_ia_resultat" in st.session_state:
         resultat = st.session_state.analyse_ia_resultat
-
         st.markdown("---")
 
         if "prediction" in resultat:
             st.subheader("🔮 Prédiction")
             st.info(resultat["prediction"])
 
-        st.markdown("---")
-
-        export_json = json.dumps(resultat, ensure_ascii=False, indent=2)
-
-        st.download_button(
-            "📥 Export JSON",
-            data=export_json,
-            file_name="analyse_ia.json",
-            mime="application/json",
-            use_container_width=True
-        
-        )
         if "resume_executif" in resultat:
-            st.subheader("📌 Résumé exécutif")
+            st.subheader(" Résumé exécutif")
             st.info(resultat["resume_executif"])
 
         if "actions_prioritaires" in resultat:
             st.subheader("🚀 Actions prioritaires")
             for action in resultat["actions_prioritaires"]:
                 st.markdown(f"""
-                **👉 {action['action']}**  
-                📌 Pourquoi: {action['pourquoi']}  
-                🎯 Impact: {action['impact']}
-                """)
+** {action['action']}**  
+ Pourquoi: {action['pourquoi']}  
+ Impact: {action['impact']}
+""")
+
+        st.markdown("---")
+        st.download_button(
+            "📥 Export JSON",
+            data=json.dumps(resultat, ensure_ascii=False, indent=2),
+            file_name="analyse_ia.json",
+            mime="application/json",
+            use_container_width=True
+        )
 
     st.markdown("---")
     with tab_ats:

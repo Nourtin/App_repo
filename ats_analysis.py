@@ -9,20 +9,31 @@ import plotly.express as px
 import glob
 import os
 from plotly.subplots import make_subplots
+from datetime import datetime
+
+# ─────────────────────────────────────────────
+# DARK THEME CSS (injecté une seule fois)
+# ─────────────────────────────────────────────
+
+
 
 # ─────────────────────────────────────────────
 # FONCTIONS UTILITAIRES
 # ─────────────────────────────────────────────
 
 def time_to_seconds(t_str: str) -> int:
-    if not t_str or t_str == "0:00:00":
+    if not t_str or t_str in ["0:00:00", "00:00:00"]:
         return 0
-    parts = list(map(int, t_str.split(':')))
-    if len(parts) == 3:
-        return parts[0] * 3600 + parts[1] * 60 + parts[2]
-    elif len(parts) == 2:
-        return parts[0] * 60 + parts[1]
-    return 0
+    try:
+        if ':' in t_str:
+            parts = list(map(int, t_str.split(':')))
+            if len(parts) == 3:
+                return parts[0] * 3600 + parts[1] * 60 + parts[2]
+            elif len(parts) == 2:
+                return parts[0] * 60 + parts[1]
+        return int(float(t_str))
+    except:
+        return 0
 
 # ─────────────────────────────────────────────
 # PARSER CSV ATS
@@ -119,6 +130,93 @@ def ats_to_dataframe(parsed: dict) -> pd.DataFrame:
                     "Handle Time": disp["handle_time"]
                 })
     return pd.DataFrame(rows)
+
+# ─────────────────────────────────────────────
+# TABLEAU DARK THEME — helpers
+# ─────────────────────────────────────────────
+
+def _fmt_num(n: float) -> str:
+    return f"{int(n):,}".replace(",", " ")
+
+
+def _color_pct(val: float, low: float = 2.0, high: float = 5.0) -> str:
+    if val >= high:
+        return f'<span class="val-orange">{val:.2f}%</span>'
+    elif val >= low:
+        return f'<span class="val-yellow">{val:.2f}%</span>'
+    else:
+        return f'<span class="val-green">{val:.2f}%</span>'
+
+
+def _rank_icon(i: int) -> str:
+    if i == 0:
+        return '<span class="rank-gold">🏆</span>'
+    elif i == 1:
+        return '<span class="rank-silver">⭐</span>'
+    else:
+        return '<span class="rank-bullet">▪</span>'
+
+
+def build_perf_html_table(liste_performance: list) -> str:
+    """
+    Construit le tableau HTML dark-theme à partir de liste_performance
+    (issu de analyze_ats_performance).
+    Colonnes : LISTE | APPELS | XFER | +SH | BRUT% | HORS AB% | ADC% | AB% | DROP/AB
+    """
+    headers = ["LISTE", "APPELS", "XFER", "+SH", "BRUT %", "HORS AB %",
+               "ADC %", "AB %", "DROP/AB"]
+    header_html = "".join(f"<th>{h}</th>" for h in headers)
+
+    # Trier par total_appels décroissant
+    sorted_perf = sorted(liste_performance, key=lambda x: x["total_appels"], reverse=True)
+
+    rows_html = ""
+    for i, row in enumerate(sorted_perf):
+        list_id   = row.get("liste_id", "?")
+        # Nom court : tout ce qui suit le ":" dans le nom de liste
+        full_name = row.get("liste_name", "")
+        short     = full_name.split(":", 1)[-1].strip() if ":" in full_name else full_name
+
+        # ADC badge si critique
+        adc_badge = ""
+        if row.get("taux_adc", 0) > 1.0:
+            adc_badge = '<span class="badge badge-adc">ADC!</span>'
+
+        liste_cell = (
+            f'{_rank_icon(i)}'
+            f'<span style="color:#e6edf3">#{list_id} — {short[:35]}</span>'
+            f'{adc_badge}'
+        )
+
+        # DROP/AB : nb_drop / nb_ab * 100
+        nb_drop = row.get("total_appels", 0) - row.get("xfer", 0) - row.get("aa", 0) \
+                  - row.get("na", 0) - row.get("adc", 0) - row.get("pdrop", 0) \
+                  - row.get("contacts", 0)
+        nb_drop = max(0, nb_drop)
+        nb_ab   = row.get("total_appels", 0) - row.get("na", 0)
+        drop_ab = round(nb_drop / nb_ab * 100, 1) if nb_ab > 0 else 0.0
+
+        rows_html += f"""
+        <tr>
+          <td>{liste_cell}</td>
+          <td class="val-blue">{_fmt_num(row['total_appels'])}</td>
+          <td>{_fmt_num(row['xfer'])}</td>
+          <td>{_fmt_num(row.get('contacts', 0))}</td>
+          <td>{_color_pct(row['taux_xfer_hors_pdrop'], 2, 5)}</td>
+          <td class="val-dim">{row['taux_na']:.2f}%</td>
+          <td>{_color_pct(row['taux_adc'], 0.5, 1.0)}</td>
+          <td>{row['taux_aa']:.1f}%</td>
+          <td class="val-dim">{drop_ab:.1f}%</td>
+        </tr>"""
+
+    return f"""
+    <div class="perf-table-wrap">
+      <table class="perf">
+        <thead><tr>{header_html}</tr></thead>
+        <tbody>{rows_html}</tbody>
+      </table>
+    </div>"""
+
 
 # ─────────────────────────────────────────────
 # ANALYSE AVANCÉE DES PERFORMANCES ATS
@@ -292,21 +390,36 @@ def analyze_ats_performance(all_parsed: list) -> dict:
 # ─────────────────────────────────────────────
 
 def analyze_amd_performance(all_parsed: list) -> dict:
-    DISPO_AA     = ["AA", "ANSWERING", "ANSWERING MACHINE", "REPONDEUR"]
-    DISPO_HUMAIN = ["ANSWERED", "SALE", "APPT", "CALLBK", "CONTACT", "RPC", "HUMAN"]
-    DISPO_SHORT  = ["SHCALL", "SHORT", "SHORT CALL", "RACCOCHÉ"]
-
     amd_stats = {
-        "total_appels": 0, "total_aa_detectes": 0,
-        "total_humains_detectes": 0, "total_short_calls": 0,
-        "faux_positifs_estimes": 0, "faux_negatifs_estimes": 0,
-        "taux_faux_positifs": 0.0, "taux_faux_negatifs": 0.0,
-        "taux_short_calls": 0.0, "precision_amd": 0.0,
-        "analyse_par_liste": [], "recommandations": []
+        "total_appels": 0,
+        "total_na": 0,
+        "total_ab": 0,
+        "total_aa": 0,
+        "total_shcall": 0,
+        "total_xfer": 0,
+        "total_adc": 0,
+        "total_drop": 0,
+        "total_pdrop": 0,
+        "analyse_par_liste": [],
+        "recommandations": [],
+        "taux_na": 0.0,
+        "taux_ab": 0.0,
+        "taux_aa": 0.0,
+        "taux_shcall": 0.0,
+        "taux_adc": 0.0,
+        "taux_xfer": 0.0,
+        "taux_drop": 0.0,
+        "taux_contact_estime": 0.0,
+        "taux_repondeur": 0.0,
+        "taux_invalides": 0.0,
+        "precision_amd_estimee": 0.0,
+        "pertes_contacts": 0
     }
 
     for parsed in all_parsed:
+        filename = parsed.get("filename", "Inconnu")
         for campaign in parsed.get("campaigns", []):
+            campaign_name = campaign.get("name", "SANS_CAMPAGNE")
             for liste in campaign.get("lists", []):
                 if liste.get("no_calls") or not liste.get("totals"):
                     continue
@@ -314,68 +427,236 @@ def analyze_amd_performance(all_parsed: list) -> dict:
                 if total == 0:
                     continue
 
-                aa_count = humain_count = short_count = 0
+                list_id_match = re.search(r'List ID #(\d+)', liste["name"])
+                list_id = int(list_id_match.group(1)) if list_id_match else None
+                liste_clean = liste["name"]
+                if list_id_match:
+                    liste_clean = liste["name"].replace(f"List ID #{list_id}:", "").strip()
+
+                na_count = ab_count = aa_count = shcall_count = 0
+                xfer_count = adc_count = drop_count = pdrop_count = 0
+
                 for disp in liste.get("dispositions", []):
                     disp_name = disp["disposition"].upper()
                     calls = disp["calls"]
-                    if any(a in disp_name for a in DISPO_AA):
+                    if "NA" in disp_name or "NO ANSWER" in disp_name:
+                        na_count += calls
+                    elif "AB" in disp_name or "BUSY" in disp_name or "OCCUP" in disp_name:
+                        ab_count += calls
+                    elif "AA" in disp_name or "ANSWERING" in disp_name or "REPONDEUR" in disp_name:
                         aa_count += calls
-                    elif any(h in disp_name for h in DISPO_HUMAIN):
-                        humain_count += calls
-                    elif any(s in disp_name for s in DISPO_SHORT):
-                        short_count += calls
+                    elif "SHCALL" in disp_name or "SHORT" in disp_name:
+                        shcall_count += calls
+                    elif "XFER" in disp_name or "TRANSF" in disp_name:
+                        xfer_count += calls
+                    elif "ADC" in disp_name or "INVALID" in disp_name or "WRONG" in disp_name:
+                        adc_count += calls
+                    elif "DROP" in disp_name and "PDROP" not in disp_name:
+                        drop_count += calls
+                    elif "PDROP" in disp_name:
+                        pdrop_count += calls
 
-                amd_stats["total_appels"]           += total
-                amd_stats["total_aa_detectes"]      += aa_count
-                amd_stats["total_humains_detectes"] += humain_count
-                amd_stats["total_short_calls"]      += short_count
+                amd_stats["total_appels"]  += total
+                amd_stats["total_na"]      += na_count
+                amd_stats["total_ab"]      += ab_count
+                amd_stats["total_aa"]      += aa_count
+                amd_stats["total_shcall"]  += shcall_count
+                amd_stats["total_xfer"]    += xfer_count
+                amd_stats["total_adc"]     += adc_count
+                amd_stats["total_drop"]    += drop_count
+                amd_stats["total_pdrop"]   += pdrop_count
 
-                faux_pos = int(short_count * 0.4)
-                faux_neg = int(aa_count * 0.15)
-                amd_stats["faux_positifs_estimes"] += faux_pos
-                amd_stats["faux_negatifs_estimes"] += faux_neg
+                taux_na     = (na_count     / total) * 100 if total > 0 else 0
+                taux_ab     = (ab_count     / total) * 100 if total > 0 else 0
+                taux_aa     = (aa_count     / total) * 100 if total > 0 else 0
+                taux_shcall = (shcall_count / total) * 100 if total > 0 else 0
+                taux_adc    = (adc_count    / total) * 100 if total > 0 else 0
 
-                list_id_match = re.search(r'List ID #(\d+)', liste["name"])
-                list_id = int(list_id_match.group(1)) if list_id_match else None
+                if taux_shcall > 2:
+                    qualite_amd    = "🔴 À optimiser"
+                    recommandation = "Trop de courts appels - Réduire sensibilité AMD"
+                elif taux_shcall > 1:
+                    qualite_amd    = "🟡 Acceptable"
+                    recommandation = "AMD correcte - Surveiller les courts appels"
+                else:
+                    qualite_amd    = "🟢 Bonne"
+                    recommandation = "AMD performante - Continuer avec ces paramètres"
 
                 amd_stats["analyse_par_liste"].append({
-                    "liste_id": list_id, "liste_name": liste["name"], "total": total,
-                    "aa": aa_count, "taux_aa": round((aa_count / total) * 100, 2),
-                    "humains": humain_count, "taux_humain": round((humain_count / total) * 100, 2),
-                    "short_calls": short_count,
-                    "qualite_detection": "Bonne" if short_count < total * 0.05 else "À améliorer"
+                    "campagne": campaign_name,
+                    "liste_id": list_id,
+                    "liste_name": liste_clean[:40] + "..." if len(liste_clean) > 40 else liste_clean,
+                    "total": total,
+                    "NA": na_count,      "NA_%":     round(taux_na, 1),
+                    "AB": ab_count,      "AB_%":     round(taux_ab, 1),
+                    "AA": aa_count,      "AA_%":     round(taux_aa, 1),
+                    "SHCALL": shcall_count, "SHCALL_%": round(taux_shcall, 2),
+                    "ADC": adc_count,    "ADC_%":    round(taux_adc, 2),
+                    "qualite_amd": qualite_amd,
+                    "recommandation": recommandation
                 })
 
     if amd_stats["total_appels"] > 0:
         t = amd_stats["total_appels"]
-        amd_stats["taux_short_calls"]   = round((amd_stats["total_short_calls"]     / t) * 100, 2)
-        amd_stats["taux_faux_positifs"] = round((amd_stats["faux_positifs_estimes"] / t) * 100, 2)
-        amd_stats["taux_faux_negatifs"] = round((amd_stats["faux_negatifs_estimes"] / t) * 100, 2)
-        total_det = amd_stats["total_aa_detectes"] + amd_stats["total_humains_detectes"]
-        if total_det > 0:
-            erreurs = amd_stats["faux_positifs_estimes"] + amd_stats["faux_negatifs_estimes"]
-            amd_stats["precision_amd"] = round(100 - ((erreurs / total_det) * 100), 2)
+        amd_stats["taux_na"]     = round((amd_stats["total_na"]     / t) * 100, 2)
+        amd_stats["taux_ab"]     = round((amd_stats["total_ab"]     / t) * 100, 2)
+        amd_stats["taux_aa"]     = round((amd_stats["total_aa"]     / t) * 100, 2)
+        amd_stats["taux_shcall"] = round((amd_stats["total_shcall"] / t) * 100, 2)
+        amd_stats["taux_adc"]    = round((amd_stats["total_adc"]    / t) * 100, 2)
+        amd_stats["taux_xfer"]   = round((amd_stats["total_xfer"]   / t) * 100, 2)
+        amd_stats["taux_drop"]   = round((amd_stats["total_drop"]   / t) * 100, 2)
+        amd_stats["taux_contact_estime"] = round(amd_stats["taux_xfer"], 2)
+        precision = 100 - (amd_stats["taux_shcall"] * 2) - (amd_stats["taux_adc"] * 0.5)
+        amd_stats["precision_amd_estimee"] = round(max(0, min(100, precision)), 1)
+        amd_stats["pertes_contacts"] = amd_stats["total_shcall"]
 
-    if amd_stats["taux_short_calls"] > 5:
+    if amd_stats["taux_shcall"] > 2:
         amd_stats["recommandations"].append({
-            "probleme": "Trop de courts appels (>5%)",
-            "cause": "Détection AMD trop lente ou faux positifs",
-            "solution": "Augmenter le temps d'analyse AMD de 2 à 3 secondes"
+            "priorite": "Haute",
+            "probleme": f"Taux de courts appels élevé ({amd_stats['taux_shcall']}%)",
+            "impact": f"{amd_stats['pertes_contacts']:,} contacts potentiels perdus",
+            "cause": "Détection AMD trop agressive ou lente",
+            "solution": "Augmenter le délai d'analyse AMD de 2 à 3 secondes"
         })
-    if amd_stats["taux_faux_positifs"] > 3:
+    if amd_stats["taux_aa"] < 5 and amd_stats["taux_na"] > 40:
         amd_stats["recommandations"].append({
-            "probleme": "Taux de faux positifs élevé (>3%)",
-            "cause": "Le bot laisse des messages sur des humains",
-            "solution": "Baisser le seuil de confiance AMD"
+            "priorite": "Moyenne",
+            "probleme": "Faible détection des répondeurs",
+            "impact": "Messages vocaux non déposés sur répondeurs",
+            "cause": "Seuil AMD trop élevé ou désactivé",
+            "solution": "Activer l'AMD avec un seuil de confiance à 70%"
         })
-    if amd_stats["precision_amd"] < 85:
+    if amd_stats["taux_adc"] > 2:
         amd_stats["recommandations"].append({
-            "probleme": f"Précision AMD faible ({amd_stats['precision_amd']}%)",
-            "cause": "Mauvaise calibration ou opérateur télécom difficile",
-            "solution": "Revoir les paramètres AMD ou changer de fournisseur"
+            "priorite": "Haute",
+            "probleme": f"Taux d'invalides élevé ({amd_stats['taux_adc']}%)",
+            "impact": "Perte de temps dialer sur mauvais numéros",
+            "cause": "Listes non nettoyées",
+            "solution": "Nettoyer les listes avant campagne (supprimer ADC > 2%)"
+        })
+    if amd_stats["taux_ab"] > 30:
+        amd_stats["recommandations"].append({
+            "priorite": "Moyenne",
+            "probleme": f"Fort taux d'occupés ({amd_stats['taux_ab']}%)",
+            "impact": "Numéros non contactés mais valides",
+            "cause": "Créneaux horaires surchargés",
+            "solution": "Recycler les occupés sur 3 tentatives à J+1, J+3, J+7"
         })
 
     return amd_stats
+
+
+# ─────────────────────────────────────────────
+# AFFICHAGE AMD
+# ─────────────────────────────────────────────
+
+def display_amd_analysis(amd: dict):
+    st.subheader(" Analyse AMD - Détection Répondeur/Humain")
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.metric(" Total Appels", f"{amd['total_appels']:,}")
+    with col2:
+        st.metric(" Répondeurs (AA)", f"{amd['taux_aa']}%",
+                  delta=f"{amd['total_aa']:,} appels")
+    with col3:
+        st.metric("⚡ Courts appels", f"{amd['taux_shcall']}%",
+                  delta=f"{amd['total_shcall']:,} appels",
+                  delta_color="inverse" if amd['taux_shcall'] > 2 else "normal")
+    with col4:
+        st.metric(" Invalides", f"{amd['taux_adc']}%",
+                  delta=f"{amd['total_adc']:,} appels",
+                  delta_color="inverse" if amd['taux_adc'] > 1 else "normal")
+    with col5:
+        precision = amd['precision_amd_estimee']
+        st.metric(" Précision AMD", f"{precision}%",
+                  delta="Bonne" if precision > 90 else "À améliorer")
+
+    st.markdown("###  Répartition Globale des Dispositions")
+    labels = ['NA (Non réponse)', 'AB (Occupé)', 'AA (Répondeur)',
+              'XFER (Contact)', 'SHCALL (Court)', 'ADC (Invalide)',
+              'DROP/PDRP (Abandon)']
+    values = [
+        amd['total_na'], amd['total_ab'], amd['total_aa'],
+        amd['total_xfer'], amd['total_shcall'], amd['total_adc'],
+        amd['total_drop'] + amd['total_pdrop']
+    ]
+    colors = ['#FFA07A', '#FFD700', '#FF8C00', '#32CD32', '#FF4500', '#DC143C', '#808080']
+    filtered_data = [(l, v, c) for l, v, c in zip(labels, values, colors) if v > 0]
+    if filtered_data:
+        labels, values, colors = zip(*filtered_data)
+    fig = go.Figure(data=[go.Pie(
+        labels=labels, values=values,
+        marker=dict(colors=list(colors)),
+        textinfo='label+percent', textposition='outside', hole=0.3
+    )])
+    fig.update_layout(height=400, showlegend=True)
+    st.plotly_chart(fig, use_container_width=True)
+
+    if amd['recommandations']:
+        st.markdown("###  Recommandations AMD")
+        for rec in amd['recommandations']:
+            with st.container():
+                if rec['priorite'] == 'Haute':
+                    st.error(f"**🔴 {rec['probleme']}**")
+                else:
+                    st.warning(f"**🟡 {rec['probleme']}**")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.caption(f" Cause: {rec['cause']}")
+                    st.caption(f"💥 Impact: {rec['impact']}")
+                with col2:
+                    st.success(f" Solution: {rec['solution']}")
+                st.divider()
+
+    st.markdown("###  Détail par Liste")
+    if amd['analyse_par_liste']:
+        df_amd = pd.DataFrame(amd['analyse_par_liste'])
+        colonnes_ordre = ['campagne', 'liste_name', 'total',
+                          'NA', 'NA_%', 'AB', 'AB_%', 'AA', 'AA_%',
+                          'SHCALL', 'SHCALL_%', 'ADC', 'ADC_%', 'qualite_amd']
+        df_display = df_amd[colonnes_ordre].copy()
+        df_display.columns = [
+            'Campagne', 'Liste', 'Total Appels',
+            'NA', 'NA %', 'AB', 'AB %', 'AA', 'AA %',
+            'SHCALL', 'SHCALL %', 'ADC', 'ADC %', 'Qualité AMD'
+        ]
+        for col in ['NA %', 'AB %', 'AA %']:
+            df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}%")
+        for col in ['SHCALL %', 'ADC %']:
+            df_display[col] = df_display[col].apply(lambda x: f"{x:.2f}%")
+        df_display['Statut'] = df_display['Qualité AMD'].apply(
+            lambda q: '' if '🟢' in q else ('' if '🟡' in q else '')
+        )
+        cols = ['Statut', 'Campagne', 'Liste', 'Total Appels',
+                'NA', 'NA %', 'AB', 'AB %', 'AA', 'AA %',
+                'SHCALL', 'SHCALL %', 'ADC', 'ADC %', 'Qualité AMD']
+        df_display = df_display[cols]
+        st.dataframe(
+            df_display, use_container_width=True, hide_index=True,
+            column_config={
+                "Statut":       st.column_config.TextColumn(width="small"),
+                "Total Appels": st.column_config.NumberColumn(format="%d"),
+                "NA":           st.column_config.NumberColumn(format="%d"),
+                "AB":           st.column_config.NumberColumn(format="%d"),
+                "AA":           st.column_config.NumberColumn(format="%d"),
+                "SHCALL":       st.column_config.NumberColumn(format="%d"),
+                "ADC":          st.column_config.NumberColumn(format="%d"),
+            }
+        )
+        st.caption(" Bonne |  Acceptable |  À optimiser")
+
+    st.markdown("### 💸 Analyse des Pertes")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("📉 Contacts perdus (SHCALL)", f"{amd['total_shcall']:,}")
+    with col2:
+        st.metric("🗑️ Appels inutiles (ADC)", f"{amd['total_adc']:,}")
+    with col3:
+        total_pertes = amd['total_shcall'] + amd['total_adc']
+        taux_perte = round((total_pertes / amd['total_appels']) * 100, 2) if amd['total_appels'] > 0 else 0
+        st.metric("💸 Taux de perte global", f"{taux_perte}%")
+
 
 # ─────────────────────────────────────────────
 # ANALYSE FENÊTRES HORAIRES
@@ -399,7 +680,6 @@ def analyze_time_slots(all_parsed: list) -> dict:
     }
 
     total_contacts = total_aa = total_appels = 0
-
     for parsed in all_parsed:
         for campaign in parsed.get("campaigns", []):
             for liste in campaign.get("lists", []):
@@ -454,6 +734,7 @@ def analyze_time_slots(all_parsed: list) -> dict:
     time_slots["taux_contact_moyen"] = round((total_contacts / total_appels) * 100, 2) if total_appels > 0 else 0
     return time_slots
 
+
 # ─────────────────────────────────────────────
 # SCORING QUALITÉ LISTES
 # ─────────────────────────────────────────────
@@ -497,7 +778,6 @@ def analyze_list_quality(all_parsed: list) -> dict:
 
                 taux_adc     = (adc      / total) * 100 if total > 0 else 0
                 taux_contact = (contacts / total) * 100 if total > 0 else 0
-
                 score_adc        = max(0, 40 - (taux_adc * 20))
                 score_contact    = min(40, taux_contact * 4)
                 score_recyclable = min(20, ((na + ab) / total) * 40)
@@ -533,41 +813,65 @@ def analyze_list_quality(all_parsed: list) -> dict:
 
     quality_analysis["listes"].sort(key=lambda x: x["score"], reverse=True)
     quality_analysis["top_listes"] = quality_analysis["listes"][:5]
-
     if quality_analysis["listes"]:
         quality_analysis["score_moyen"] = round(
             sum(l["score"] for l in quality_analysis["listes"]) / len(quality_analysis["listes"]), 1
         )
-
     return quality_analysis
+
 
 # ─────────────────────────────────────────────
 # AFFICHAGE ANALYSES AVANCÉES ATS
+# (tableau dark theme + onglets existants)
 # ─────────────────────────────────────────────
 
 def display_advanced_ats_analysis(all_parsed: list):
     st.markdown("---")
-    st.header("📊 Analyses Avancées ATS")
+    st.header(" Analyses Avancées ATS")
 
-    with st.spinner("🔍 Calcul des métriques avancées..."):
+    with st.spinner(" Calcul des métriques avancées..."):
         analysis = analyze_ats_performance(all_parsed)
 
-    st.subheader("📈 Indicateurs Clés")
+    # ── KPIs globaux ──────────────────────────
+    st.subheader(" Indicateurs Clés")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📞 Total Appels", f"{analysis['resume_xfer']['total_appels']:,}")
+        st.metric(" Total Appels", f"{analysis['resume_xfer']['total_appels']:,}")
     with col2:
-        st.metric("🔄 Taux XFER (hors PDROP)", f"{analysis['resume_xfer']['taux_xfer_hors_pdrop_global']}%")
+        st.metric(" Taux XFER (hors PDROP)", f"{analysis['resume_xfer']['taux_xfer_hors_pdrop_global']}%")
     with col3:
-        st.metric("⚠️ Taux ADC", f"{analysis['analyse_adc']['taux_invalides']}%")
+        st.metric(" Taux ADC", f"{analysis['analyse_adc']['taux_invalides']}%")
     with col4:
         st.metric("♻️ Potentiel Recyclage", f"{analysis['potentiel_recyclage']['taux_recyclage']}%")
 
     st.divider()
 
+    # ── TABLEAU DARK THEME ────────────────────
+    st.subheader("🖥️ Performance × Qualification")
+
+    if analysis["liste_performance"]:
+        # Injecter le CSS une seule fois
+        st.markdown()
+
+        from datetime import date
+        today_str = date.today().strftime("%d/%m/%Y")
+        st.markdown(
+            f'<div class="perf-title">// <span>PERFORMANCE × QUALIFICATION</span> — EOD {today_str}</div>',
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            build_perf_html_table(analysis["liste_performance"]),
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("Aucune donnée de performance disponible.")
+
+    st.divider()
+
+    # ── Onglets détaillés ─────────────────────
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📋 Performance par Liste", "🔄 Classement XFER",
-        "⚠️ Analyse ADC", "♻️ Potentiel Recyclage"
+        " Performance par Liste", " Classement XFER",
+        " Analyse ADC", "♻️ Potentiel Recyclage"
     ])
 
     with tab1:
@@ -594,7 +898,7 @@ def display_advanced_ats_analysis(all_parsed: list):
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        st.subheader("🔄 Classement - Taux XFER hors PDROP")
+        st.subheader(" Classement - Taux XFER hors PDROP")
         df_xfer = pd.DataFrame(analysis["classement_xfer"])
         if not df_xfer.empty:
             col1, col2 = st.columns([2, 1])
@@ -625,7 +929,7 @@ def display_advanced_ats_analysis(all_parsed: list):
             st.dataframe(df_xfer_display, use_container_width=True, hide_index=True)
 
     with tab3:
-        st.subheader("⚠️ Analyse ADC - Numéros invalides")
+        st.subheader(" Analyse ADC - Numéros invalides")
         adc = analysis["analyse_adc"]
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -635,9 +939,9 @@ def display_advanced_ats_analysis(all_parsed: list):
         with col3:
             taux = adc["taux_invalides"]
             if taux < 0.5:
-                st.metric("Taux ADC", f"{taux:.2f}%", delta="✅ Normal")
+                st.metric("Taux ADC", f"{taux:.2f}%", delta=" Normal")
             elif taux < 1.0:
-                st.metric("Taux ADC", f"{taux:.2f}%", delta="⚠️ Attention")
+                st.metric("Taux ADC", f"{taux:.2f}%", delta=" Attention")
             else:
                 st.metric("Taux ADC", f"{taux:.2f}%", delta="🔴 Critique", delta_color="inverse")
 
@@ -657,11 +961,12 @@ def display_advanced_ats_analysis(all_parsed: list):
                 st.caption(f"Fichier: {critique['fichier']} | Campagne: {critique['campagne']}")
                 st.divider()
         else:
-            st.success("✅ Aucune session critique détectée")
+            st.success(" Aucune session critique détectée")
 
         st.markdown("### Détail ADC par liste")
         df_adc = pd.DataFrame(adc["details_par_liste"])
-        df_adc = df_adc[df_adc["adc"] > 0].sort_values("taux_adc", ascending=False) if not df_adc.empty else df_adc
+        if not df_adc.empty:
+            df_adc = df_adc[df_adc["adc"] > 0].sort_values("taux_adc", ascending=False)
         if not df_adc.empty:
             df_adc_display = df_adc.copy()
             df_adc_display["taux_adc"] = df_adc_display["taux_adc"].apply(lambda x: f"{x:.2f}%")
@@ -682,7 +987,7 @@ def display_advanced_ats_analysis(all_parsed: list):
         with col3:
             st.metric("Taux Recyclage", f"{rec['taux_recyclage']:.2f}%")
 
-        st.markdown("### 📋 Top Listes à Recycler")
+        st.markdown("###  Top Listes à Recycler")
         df_rec = pd.DataFrame(rec["top_listes_recyclage"])
         if not df_rec.empty:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -708,76 +1013,25 @@ def display_advanced_ats_analysis(all_parsed: list):
             })
             st.dataframe(df_rec_display, use_container_width=True, hide_index=True)
 
+
 # ─────────────────────────────────────────────
 # AFFICHAGE INSIGHTS AVANCÉS
 # ─────────────────────────────────────────────
 
 def display_advanced_insights(all_parsed: list):
     st.markdown("---")
-    st.header("🔬 Analyses Avancées - Optimisation Voicebot")
 
     tab_amd, tab_time, tab_quality = st.tabs([
-        "🎯 Performance AMD", "⏰ Fenêtres Horaires", "📊 Scoring Qualité Listes"
+        " Performance AMD", " Fenêtres Horaires", " Scoring Qualité Listes"
     ])
 
     with tab_amd:
-        st.subheader("🎯 Analyse de Détection Répondeur/Humain (AMD)")
         with st.spinner("Analyse AMD en cours..."):
             amd = analyze_amd_performance(all_parsed)
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Précision AMD", f"{amd['precision_amd']}%",
-                      delta="Bonne" if amd['precision_amd'] > 90 else "À améliorer")
-        with col2:
-            st.metric("Faux Positifs", f"{amd['taux_faux_positifs']}%",
-                      help="Messages laissés sur des humains")
-        with col3:
-            st.metric("Faux Négatifs", f"{amd['taux_faux_negatifs']}%",
-                      help="Bots parlant à des répondeurs")
-        with col4:
-            st.metric("Courts Appels", f"{amd['taux_short_calls']}%",
-                      help="Appels < 5 sec")
-
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=amd['precision_amd'],
-                title={'text': "Précision AMD (%)"},
-                gauge={
-                    'axis': {'range': [0, 100]},
-                    'bar': {'color': "darkblue"},
-                    'steps': [
-                        {'range': [0, 70],   'color': "red"},
-                        {'range': [70, 85],  'color': "orange"},
-                        {'range': [85, 100], 'color': "green"}
-                    ],
-                    'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': 90}
-                }
-            ))
-            fig.update_layout(height=250)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col_g2:
-            labels = ['Répondeurs', 'Humains', 'Courts appels']
-            values = [amd['total_aa_detectes'], amd['total_humains_detectes'], amd['total_short_calls']]
-            fig = go.Figure(data=[go.Pie(
-                labels=labels, values=values,
-                marker=dict(colors=['orange', 'green', 'red'])
-            )])
-            fig.update_layout(title="Répartition des détections", height=250)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with st.expander("📋 Détail AMD par liste", expanded=False):
-            df_amd = pd.DataFrame(amd['analyse_par_liste'])
-            if not df_amd.empty:
-                df_amd_display = df_amd[['liste_id', 'total', 'aa', 'taux_aa', 'humains', 'taux_humain', 'short_calls', 'qualite_detection']]
-                df_amd_display.columns = ['ID', 'Appels', 'AA', 'AA %', 'Humains', 'Humain %', 'Courts', 'Qualité']
-                st.dataframe(df_amd_display, use_container_width=True, hide_index=True)
+        display_amd_analysis(amd)
 
     with tab_time:
-        st.subheader("⏰ Optimisation des Créneaux Horaires")
+        st.subheader(" Optimisation des Créneaux Horaires")
         with st.spinner("Analyse des créneaux..."):
             timeslots = analyze_time_slots(all_parsed)
 
@@ -798,12 +1052,35 @@ def display_advanced_insights(all_parsed: list):
                           secondary_y=True)
             fig.update_layout(title="Performance par créneau horaire (estimation)",
                               barmode='group', hovermode='x unified', height=400)
-            fig.update_yaxes(title_text="Nombre d'appels",     secondary_y=False)
-            fig.update_yaxes(title_text="Taux de contact (%)", secondary_y=True)
+            fig.update_yaxes(title_text="Nombre d'appels",      secondary_y=False)
+            fig.update_yaxes(title_text="Taux de contact (%)",  secondary_y=True)
             st.plotly_chart(fig, use_container_width=True)
 
+        if timeslots.get('recommandations_horaires'):
+            st.markdown("###  Recommandations Horaires")
+            for rec in timeslots['recommandations_horaires']:
+                if rec.get('creneau'):
+                    with st.container():
+                        st.success(f"**{rec['creneau']}** - Taux de contact: {rec['taux']}%")
+                        st.caption(f" {rec['action']}")
+                        st.info(f" Gain potentiel: {rec['gain_potentiel']}")
+
+        with st.expander(" Conseils d'optimisation horaire", expanded=False):
+            st.markdown("""
+**Bonnes pratiques pour les voicebots:**
+- **Matin (8h-10h)** : Idéal pour les professionnels (B2B)
+- **Midi (12h-14h)** : À ÉVITER (pause déjeuner, taux de répondeur élevé)
+- **Soirée (17h-20h)** : Meilleur créneau B2C (présence à domicile)
+- **Soir (>20h)** : Risque légal (interdiction d'appeler après 20h en France)
+
+**Stratégie recommandée:**
+1. Nouveaux appels : 17h-20h (B2C) ou 10h-12h (B2B)
+2. Premiers rappels : 14h-17h
+3. Derniers rappels : 8h-10h
+            """)
+
     with tab_quality:
-        st.subheader("📊 Scoring de Qualité des Listes")
+        st.subheader(" Scoring de Qualité des Listes")
         with st.spinner("Calcul des scores de qualité..."):
             quality = analyze_list_quality(all_parsed)
 
@@ -814,46 +1091,63 @@ def display_advanced_insights(all_parsed: list):
             nb_excellentes = len([l for l in quality['listes'] if l['qualite'] == 'Excellente'])
             st.metric("Listes Excellent 🟢", nb_excellentes)
         with col3:
-            st.metric("Listes à nettoyer 🔴", len(quality['listes_a_nettoyer']))
+            st.metric("Listes à nettoyer 🔴", len(quality.get('listes_a_nettoyer', [])))
 
         st.markdown("### 🏆 Top 5 - Meilleures Listes")
-        for i, liste in enumerate(quality['top_listes'], 1):
-            col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
-            with col1:
-                st.markdown(f"**{i}. {liste['emoji']} Liste #{liste['liste_id']}**")
-                st.caption(str(liste['liste_name'])[:50] + "...")
-            with col2:
-                st.metric("Score",   f"{liste['score']}/100")
-            with col3:
-                st.metric("Contact", f"{liste['taux_contact']}%")
-            with col4:
-                st.metric("ADC",     f"{liste['taux_adc']}%")
-            st.divider()
+        if quality.get('top_listes'):
+            for i, liste in enumerate(quality['top_listes'], 1):
+                col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
+                with col1:
+                    st.markdown(f"**{i}. {liste['emoji']} Liste #{liste['liste_id']}**")
+                    liste_name_short = liste['liste_name'][:50] + "..." if len(liste['liste_name']) > 50 else liste['liste_name']
+                    st.caption(liste_name_short)
+                with col2:
+                    st.metric("Score", f"{liste['score']}/100")
+                with col3:
+                    st.metric("Contact", f"{liste['taux_contact']}%")
+                with col4:
+                    st.metric("ADC", f"{liste['taux_adc']}%")
+                if liste.get('recommandation'):
+                    st.caption(f" {liste['recommandation']}")
+                st.divider()
+        else:
+            st.info("Aucune liste trouvée")
 
-        if quality['listes_a_nettoyer']:
-            st.markdown("### ⚠️ Listes Nécessitant un Nettoyage")
+        if quality.get('listes_a_nettoyer'):
+            st.markdown("###  Listes Nécessitant un Nettoyage")
             for liste in quality['listes_a_nettoyer'][:5]:
-                st.error(f"**🔴 Liste #{liste['liste_id']}** - {liste['taux_adc']}% ADC")
-                st.caption(f"📁 {liste['fichier']}")
-                st.warning(f"💡 {liste['recommandation']}")
+                with st.container():
+                    st.error(f"**🔴 Liste #{liste['liste_id']}** - {liste['taux_adc']}% ADC")
+                    st.caption(f" {liste['fichier']}")
+                    if liste.get('recommandation'):
+                        st.warning(f" {liste['recommandation']}")
+                    st.divider()
 
-        with st.expander("📋 Scoring complet des listes", expanded=False):
-            df_quality = pd.DataFrame(quality['listes'])
-            if not df_quality.empty:
-                df_display = df_quality[['emoji', 'liste_id', 'fichier', 'total_appels', 'taux_contact', 'taux_adc', 'score', 'qualite']]
+        with st.expander(" Scoring complet des listes", expanded=False):
+            if quality.get('listes'):
+                df_quality = pd.DataFrame(quality['listes'])
+                df_display = df_quality[['emoji', 'liste_id', 'fichier', 'total_appels', 'taux_contact', 'taux_adc', 'score', 'qualite']].copy()
                 df_display.columns = ['', 'ID', 'Fichier', 'Appels', 'Contact %', 'ADC %', 'Score', 'Qualité']
+                df_display['Contact %'] = df_display['Contact %'].apply(lambda x: f"{x:.1f}%")
+                df_display['ADC %']     = df_display['ADC %'].apply(lambda x: f"{x:.2f}%")
                 st.dataframe(df_display, use_container_width=True, hide_index=True)
+            else:
+                st.info("Aucune donnée disponible")
 
         with st.expander("ℹ️ Comment est calculé le score de qualité ?", expanded=False):
             st.markdown("""
 **Méthodologie de scoring (0-100 points):**
-- **40 points** : Taux d'invalides (ADC) faible → 0% ADC = 40 pts, 2% ADC = 0 pts
-- **40 points** : Taux de contact élevé → 10% contact = 40 pts
-- **20 points** : Potentiel de recyclage (NA + Occupé) → 50% recyclable = 20 pts
+- **40 points** : Taux d'invalides (ADC) faible — 0% ADC = 40 pts, 2% ADC = 0 pts
+- **40 points** : Taux de contact élevé — 10% = 40 pts, 5% = 20 pts
+- **20 points** : Potentiel de recyclage (NA + Occupé) — 50% recyclable = 20 pts
 
 **Interprétation:**
-- 🟢 80-100 : Excellente | 🟡 60-79 : Bonne | 🟠 40-59 : Moyenne | 🔴 0-39 : À nettoyer
+- 🟢 80-100 : Excellente  
+- 🟡 60-79  : Bonne  
+- 🟠 40-59  : Moyenne  
+- 🔴 0-39   : À nettoyer
             """)
+
 
 # ─────────────────────────────────────────────
 # RÉSUMÉ POUR GEMINI
@@ -881,6 +1175,7 @@ def resumer_ats_pour_gemini(all_parsed: list) -> dict:
         summary["fichiers"].append(fichier_summary)
     return summary
 
+
 # ─────────────────────────────────────────────
 # GEMINI ANALYSE
 # ─────────────────────────────────────────────
@@ -890,7 +1185,7 @@ def analyser_ats_avec_gemini(api_key: str, summary: dict) -> dict | None:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel("gemini-2.5-flash")
     except Exception as e:
-        st.error(f"❌ Erreur connexion Gemini: {e}")
+        st.error(f" Erreur connexion Gemini: {e}")
         return None
 
     prompt = f"""
@@ -928,7 +1223,6 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
     "prediction": "prédiction sur le rendement si les actions sont appliquées"
 }}
 """
-
     try:
         response = model.generate_content(prompt)
         text = response.text.strip()
@@ -949,19 +1243,290 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
         st.error(f"Erreur API Gemini: {e}")
         return None
 
+
 # ─────────────────────────────────────────────
 # ONGLET PRINCIPAL STREAMLIT
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# TABLEAU PERFORMANCE • QUALIFICATION – EOD
+# ─────────────────────────────────────────────
 
+def generate_eod_table_force(all_parsed: list) -> pd.DataFrame:
+    """Version qui force l'extraction sans vérifications."""
+    
+    rows = []
+    
+    for parsed in all_parsed:
+        for campaign in parsed.get("campaigns", []):
+            campaign_name = campaign.get("name", "SANS_CAMPAGNE")
+            
+            for liste in campaign.get("lists", []):
+                # Ignorer seulement si no_calls est explicitement True
+                if liste.get("no_calls") == True:
+                    continue
+                
+                # Essayer de récupérer le total
+                totals = liste.get("totals", {})
+                total = totals.get("calls", 0) if totals else 0
+                
+                # Si pas de total, essayer de le calculer
+                if total == 0:
+                    for disp in liste.get("dispositions", []):
+                        total += disp.get("calls", 0)
+                
+                if total == 0:
+                    continue
+                
+                # Extraction ID
+                list_id_match = re.search(r'List ID #(\d+)', liste.get("name", ""))
+                list_id = list_id_match.group(1) if list_id_match else "???"
+                
+                liste_clean = liste.get("name", "")
+                if list_id_match:
+                    liste_clean = liste_clean.replace(f"List ID #{list_id}:", "").strip()
+                
+                # Compteurs à 0
+                ab = xfer = shcall = drop = pdrop = adc = 0
+                
+                for disp in liste.get("dispositions", []):
+                    disp_name = disp.get("disposition", "").upper().strip()
+                    calls = disp.get("calls", 0)
+                    
+                    if "AB" in disp_name:
+                        ab = calls
+                    elif "XFER" in disp_name:
+                        xfer = calls
+                    elif "SHCALL" in disp_name or "SHORT" in disp_name:
+                        shcall = calls
+                    elif "ADC" in disp_name:
+                        adc = calls
+                    elif disp_name == "DROP":
+                        drop = calls
+                    elif disp_name == "PDROP":
+                        pdrop = calls
+                
+                # Calculs
+                hors_ab = total - ab
+                drop_ab = drop + pdrop
+                brut = round(((xfer + shcall) / total) * 100, 2) if total > 0 else 0
+                adc_pct = round((adc / hors_ab) * 100, 2) if hors_ab > 0 else 0
+                ab_pct = round((ab / total) * 100, 2) if total > 0 else 0
+                
+                rows.append({
+                    "LISTE": f"#{list_id} – {liste_clean[:35]}",
+                    "SRV": campaign_name[:10],
+                    "APPELS": total,
+                    "XFER": xfer,
+                    "+SH": shcall,
+                    "BRUT": brut,
+                    "HORS AB": hors_ab,
+                    "ADC%": adc_pct,
+                    "AB%": ab_pct,
+                    "DROP/AB": drop_ab,
+                    "FICHES": xfer,
+                    "XS/AISIE": xfer,
+                    "%SAISIE": 100.0 if xfer > 0 else 0,
+                    "CHAUDS": 0,
+                    "XCH/X": 0.0
+                })
+    
+    return pd.DataFrame(rows)
+def display_eod_table(all_parsed: list):
+    """
+    Affiche le tableau PERFORMANCE • QUALIFICATION – EOD dans Streamlit.
+    """
+    from datetime import datetime
+    
+    st.markdown("---")
+    
+    today = datetime.now().strftime("%d/%m/%Y")
+    st.header(f" PERFORMANCE • QUALIFICATION – EOD {today}")
+    
+    # Utiliser la version force
+    df_eod = generate_eod_table_force(all_parsed)
+    
+    st.caption(f" {len(df_eod)} listes traitées")
+    
+    if not df_eod.empty:
+        # Créer une copie pour l'affichage
+        df_display = df_eod.copy()
+        
+        # Formater les nombres avec espaces comme séparateurs de milliers
+        for col in ["APPELS", "XFER", "+SH", "HORS AB", "DROP/AB", "FICHES", "XS/AISIE", "CHAUDS"]:
+            if col in df_display.columns:
+                df_display[col] = df_display[col].apply(lambda x: f"{int(x):,}".replace(",", " "))
+        
+        # Formater les pourcentages avec virgule comme séparateur décimal
+        for col, fmt in [("BRUT", ".2f"), ("ADC%", ".2f"), ("AB%", ".1f"), ("%SAISIE", ".1f"), ("XCH/X", ".2f")]:
+            if col in df_display.columns:
+                df_display[col] = df_display[col].apply(lambda x: f"{x:{fmt}}%".replace(".", ","))
+        
+        # Sélectionner et ordonner les colonnes
+        colonnes_ordre = ["LISTE", "SRV", "APPELS", "XFER", "+SH", "BRUT", "HORS AB", 
+                          "ADC%", "AB%", "DROP/AB", "FICHES", "XS/AISIE", "%SAISIE", "CHAUDS", "XCH/X"]
+        
+        # Garder seulement les colonnes qui existent
+        colonnes_existantes = [col for col in colonnes_ordre if col in df_display.columns]
+        df_display = df_display[colonnes_existantes]
+        
+        # Afficher le tableau
+        st.dataframe(
+            df_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "LISTE": st.column_config.TextColumn("LISTE", width="large"),
+                "SRV": st.column_config.TextColumn("SRV", width="small"),
+                "APPELS": st.column_config.TextColumn("APPELS", width="medium"),
+                "XFER": st.column_config.TextColumn("XFER", width="small"),
+                "+SH": st.column_config.TextColumn("+SH", width="small"),
+                "BRUT": st.column_config.TextColumn("BRUT", width="small"),
+                "HORS AB": st.column_config.TextColumn("HORS AB", width="medium"),
+                "ADC%": st.column_config.TextColumn("ADC%", width="small"),
+                "AB%": st.column_config.TextColumn("AB%", width="small"),
+                "DROP/AB": st.column_config.TextColumn("DROP/AB", width="small"),
+                "FICHES": st.column_config.TextColumn("FICHES", width="small"),
+                "XS/AISIE": st.column_config.TextColumn("XS/AISIE", width="small"),
+                "%SAISIE": st.column_config.TextColumn("%SAISIE", width="small"),
+                "CHAUDS": st.column_config.TextColumn("CHAUDS", width="small"),
+                "XCH/X": st.column_config.TextColumn("XCH/X", width="small"),
+            }
+        )
+        
+        # Bouton d'export CSV
+        csv = df_eod.to_csv(index=False, sep=";", decimal=",").encode('utf-8-sig')
+        st.download_button(
+            "📥 Exporter le tableau EOD (CSV)",
+            data=csv,
+            file_name=f"EOD_{today.replace('/', '-')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        # === SYNTHÈSE GLOBALE ===
+        st.markdown("---")
+        st.markdown("###  Synthèse Globale")
+        
+        # Calculer les totaux
+        total_appels = df_eod['APPELS'].sum()
+        total_xfer = df_eod['XFER'].sum()
+        total_shcall = df_eod['+SH'].sum()
+        total_fiches = df_eod['FICHES'].sum()
+        total_hors_ab = df_eod['HORS AB'].sum()
+        total_drop_ab = df_eod['DROP/AB'].sum()
+        
+        # Première ligne de métriques
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        
+        with col1:
+            st.metric(" Total Listes", len(df_eod))
+        with col2:
+            st.metric(" Total Appels", f"{total_appels:,}".replace(",", " "))
+        with col3:
+            st.metric(" Total XFER", f"{total_xfer:,}".replace(",", " "))
+        with col4:
+            st.metric("⚡ Total +SH", f"{total_shcall:,}".replace(",", " "))
+        with col5:
+            st.metric(" Total FICHES", f"{total_fiches:,}".replace(",", " "))
+        with col6:
+            st.metric("🚫 HORS AB", f"{total_hors_ab:,}".replace(",", " "))
+        
+        # Deuxième ligne de métriques (taux)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+        
+        # Calcul des taux globaux
+        brut_global = round(((total_xfer + total_shcall) / total_appels) * 100, 2) if total_appels > 0 else 0
+        adc_global = df_eod['ADC%'].mean() if 'ADC%' in df_eod.columns else 0
+        ab_global = df_eod['AB%'].mean() if 'AB%' in df_eod.columns else 0
+        saisie_global = df_eod['%SAISIE'].mean() if '%SAISIE' in df_eod.columns else 0
+        xchx_global = df_eod['XCH/X'].mean() if 'XCH/X' in df_eod.columns else 0
+        
+        with col1:
+            st.metric(" BRUT Global", f"{brut_global:.2f}%".replace(".", ","))
+        with col2:
+            st.metric(" ADC% Moyen", f"{adc_global:.2f}%".replace(".", ","))
+        with col3:
+            st.metric(" AB% Moyen", f"{ab_global:.1f}%".replace(".", ","))
+        with col4:
+            st.metric(" %SAISIE Moyen", f"{saisie_global:.1f}%".replace(".", ","))
+        with col5:
+            st.metric(" XCH/X Moyen", f"{xchx_global:.2f}%".replace(".", ","))
+        with col6:
+            taux_conversion = round((total_fiches / total_appels) * 100, 2) if total_appels > 0 else 0
+            st.metric(" Taux Contact", f"{taux_conversion:.2f}%".replace(".", ","))
+        
+        # === GRAPHIQUE RÉCAPITULATIF ===
+        st.markdown("---")
+        st.markdown("###  Répartition par Liste")
+        
+        # Top 10 listes par appels
+        df_top = df_eod.nlargest(10, "APPELS")[["LISTE", "APPELS", "XFER", "+SH", "FICHES"]].copy()
+        
+        if not df_top.empty:
+            import plotly.graph_objects as go
+            
+            fig = go.Figure()
+            
+            fig.add_trace(go.Bar(
+                name="APPELS",
+                x=df_top["LISTE"].str[:20],
+                y=df_top["APPELS"],
+                marker_color="steelblue",
+                text=df_top["APPELS"].apply(lambda x: f"{x:,}".replace(",", " ")),
+                textposition="outside"
+            ))
+            
+            fig.add_trace(go.Bar(
+                name="XFER",
+                x=df_top["LISTE"].str[:20],
+                y=df_top["XFER"],
+                marker_color="orange",
+                text=df_top["XFER"].apply(lambda x: f"{x:,}".replace(",", " ")),
+                textposition="outside"
+            ))
+            
+            fig.add_trace(go.Bar(
+                name="+SH",
+                x=df_top["LISTE"].str[:20],
+                y=df_top["+SH"],
+                marker_color="red",
+                text=df_top["+SH"].apply(lambda x: f"{x:,}".replace(",", " ")),
+                textposition="outside"
+            ))
+            
+            fig.update_layout(
+                title="Top 10 Listes - Répartition des appels",
+                barmode="group",
+                xaxis_title="Liste",
+                yaxis_title="Nombre d'appels",
+                height=500,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+        
+    else:
+        st.warning(" Aucune donnée disponible pour le tableau EOD")
+        
+        # Afficher les dispositions détectées pour debug
+        all_dispos = set()
+        for parsed in all_parsed:
+            for campaign in parsed.get("campaigns", []):
+                for liste in campaign.get("lists", []):
+                    for disp in liste.get("dispositions", []):
+                        all_dispos.add(disp.get("disposition", "").upper().strip())
+        
+        if all_dispos:
+            st.info(f" Dispositions détectées : {', '.join(sorted(all_dispos))}")
+        
+        # Afficher un aperçu de la structure
+        with st.expander(" Structure des données parsées", expanded=False):
+            if all_parsed:
+                st.json(all_parsed[0])
 def render_ats_tab(api_key_input: str = None):
-    st.header("📋 Analyse des ATS par IA")
+    st.header(" Analyse des ATS par IA")
     st.markdown("---")
 
-    # ── Clé API : vient du sidebar d'app.py ──
-    if not api_key_input:
-        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer l'analyse IA")
-
-    # ── Chargement des fichiers ───────────────
     st.subheader("📤 Sélectionner les fichiers ATS")
 
     @st.cache_data(ttl=300)
@@ -975,55 +1540,49 @@ def render_ats_tab(api_key_input: str = None):
     if os.path.exists("data/last_update.txt"):
         with open("data/last_update.txt", "r") as f:
             last_update_str = f.read().strip()
-        st.caption(f"🕐 Dernière mise à jour GitHub Actions : {last_update_str}")
+        st.caption(f" Dernière mise à jour GitHub Actions : {last_update_str}")
 
     all_files = []
 
-    # ── Menu déroulant des fichiers du repo ──
     if auto_files:
         noms_fichiers = [os.path.basename(f) for f in auto_files]
-
         fichiers_selectionnes = st.multiselect(
-            "📁 Fichiers disponibles (repo GitHub)",
+            " Fichiers disponibles (repo GitHub)",
             options=noms_fichiers,
             default=noms_fichiers,
             placeholder="Choisissez un ou plusieurs fichiers..."
         )
-
         for f in auto_files:
             if os.path.basename(f) in fichiers_selectionnes:
                 with open(f, "r", encoding="utf-8", errors="replace") as file:
                     content = file.read()
                     all_files.append({"name": os.path.basename(f), "content": content})
-
         if fichiers_selectionnes:
-            st.success(f"✅ {len(fichiers_selectionnes)} fichier(s) sélectionné(s)")
+            st.success(f" {len(fichiers_selectionnes)} fichier(s) sélectionné(s)")
         else:
-            st.warning("⚠️ Aucun fichier sélectionné")
+            st.warning(" Aucun fichier sélectionné")
     else:
         st.info("📭 Aucun fichier trouvé dans le repo (data/report_*.csv)")
 
-    # ── Upload manuel en complément ──────────
     uploaded_files = st.file_uploader(
         "➕ Ajouter des fichiers CSV manuellement",
         type=["csv", "txt"],
         accept_multiple_files=True,
         key="ats_files"
     )
-
     if uploaded_files:
         for f in uploaded_files:
             content = f.read().decode("utf-8", errors="replace")
             all_files.append({"name": f.name, "content": content})
 
+    # ── Si aucun fichier : message et on s'arrête (sans st.stop qui casse tout)
     if not all_files:
         st.info("📂 Sélectionnez ou importez au moins un fichier CSV ATS pour commencer")
-        st.stop()
+        return
 
     # ── Parsing ───────────────────────────────
     all_parsed = []
     all_dfs    = []
-
     for f in all_files:
         try:
             parsed = parse_ats_csv(f["content"], f["name"])
@@ -1032,88 +1591,133 @@ def render_ats_tab(api_key_input: str = None):
             if not df_f.empty:
                 all_dfs.append(df_f)
         except Exception as e:
-            st.warning(f"⚠️ Erreur lecture {f['name']} : {e}")
+            st.warning(f" Erreur lecture {f['name']} : {e}")
 
     df_combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
-    # ── Aperçu données ────────────────────────
-    with st.expander("📊 Aperçu des données parsées", expanded=True):
+    if df_combined.empty:
+        st.warning(" Aucune donnée exploitable dans les fichiers sélectionnés.")
+        return
+
+    # ════════════════════════════════════════════
+    # 1. APERÇU DONNÉES PARSÉES
+    # ════════════════════════════════════════════
+    with st.expander(" Aperçu des données parsées", expanded=True):
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Fichiers chargés", len(all_parsed))
-        col2.metric("Total appels",
-                    f"{df_combined['Appels'].sum():,}" if not df_combined.empty else "0")
-        col3.metric("Campagnes",
-                    sum(len(p["campaigns"]) for p in all_parsed))
-        col4.metric("Listes actives",
-                    len(df_combined["Liste"].unique()) if not df_combined.empty else 0)
+        col1.metric("Fichiers chargés",  len(all_parsed))
+        col2.metric("Total appels",      f"{df_combined['Appels'].sum():,}")
+        col3.metric("Campagnes",         sum(len(p["campaigns"]) for p in all_parsed))
+        col4.metric("Listes actives",    len(df_combined["Liste"].unique()))
+        st.dataframe(
+            df_combined.sort_values("Appels", ascending=False),
+            use_container_width=True, height=300
+        )
 
-        if not df_combined.empty:
-            st.dataframe(
-                df_combined.sort_values("Appels", ascending=False),
-                use_container_width=True, height=300
-            )
-
-    # ── Graphiques rapides ────────────────────
-    if not df_combined.empty:
-        st.markdown("---")
-        st.subheader("📈 Visualisation rapide")
-
-        col_g1, col_g2 = st.columns(2)
-        with col_g1:
-            df_disp = (df_combined.groupby("Disposition")["Appels"]
-                       .sum().reset_index()
-                       .sort_values("Appels", ascending=False)
-                       .head(10))
-            fig1 = px.bar(df_disp, x="Appels", y="Disposition", orientation="h",
-                          title="Top 10 Dispositions",
-                          color="Appels", color_continuous_scale="Blues")
-            fig1.update_layout(showlegend=False)
-            st.plotly_chart(fig1, use_container_width=True)
-
-        with col_g2:
-            df_liste = (df_combined.groupby("Liste")["Appels"]
-                        .sum().reset_index()
-                        .sort_values("Appels", ascending=False)
-                        .head(10))
-            fig2 = px.bar(df_liste, x="Appels", y="Liste", orientation="h",
-                          title="Appels par liste",
-                          color="Appels", color_continuous_scale="Greens")
-            fig2.update_layout(showlegend=False)
-            st.plotly_chart(fig2, use_container_width=True)
-
-        if all_parsed:
-            display_advanced_ats_analysis(all_parsed)
-            display_advanced_insights(all_parsed)
-
-    # ── Bouton analyse IA ─────────────────────
+    # ════════════════════════════════════════════
+    # 2. VISUALISATION RAPIDE
+    # ════════════════════════════════════════════
     st.markdown("---")
+    st.subheader(" Visualisation rapide")
+
+    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+    with col_m1:
+        st.metric(" Total Appels", f"{df_combined['Appels'].sum():,}")
+    with col_m2:
+        st.metric(" Campagnes", df_combined["Campagne"].nunique())
+    with col_m3:
+        st.metric(" Listes", df_combined["Liste"].nunique())
+    with col_m4:
+        total_sec = df_combined["Durée"].apply(time_to_seconds).sum()
+        h = total_sec // 3600
+        m = (total_sec % 3600) // 60
+        st.metric("⏱️ Durée totale", f"{h}h {m}m")
+
+    st.markdown("---")
+    col_g1, col_g2 = st.columns(2)
+    with col_g1:
+        df_disp = (df_combined.groupby("Disposition")["Appels"]
+                   .sum().reset_index()
+                   .sort_values("Appels", ascending=False)
+                   .head(10))
+        fig1 = px.bar(df_disp, x="Appels", y="Disposition", orientation="h",
+                      title="Top 10 Dispositions",
+                      color="Appels", color_continuous_scale="Blues")
+        fig1.update_layout(showlegend=False)
+        st.plotly_chart(fig1, use_container_width=True)
+    with col_g2:
+        df_liste = (df_combined.groupby("Liste")["Appels"]
+                    .sum().reset_index()
+                    .sort_values("Appels", ascending=False)
+                    .head(10))
+        fig2 = px.bar(df_liste, x="Appels", y="Liste", orientation="h",
+                      title="Top 10 Listes par appels",
+                      color="Appels", color_continuous_scale="Greens")
+        fig2.update_layout(showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    col_g3, col_g4 = st.columns(2)
+    
+
+
+    st.markdown("---")
+    st.subheader(" Détail par Liste et Disposition")
+    df_detail = (df_combined.groupby(["Campagne", "Liste", "Disposition"])
+                 .agg(Appels=("Appels", "sum"))
+                 .reset_index()
+                 .sort_values(["Campagne", "Liste", "Appels"], ascending=[True, True, False]))
+    df_detail["Part %"] = (
+        df_detail.groupby("Liste")["Appels"]
+        .transform(lambda x: (x / x.sum() * 100).round(1))
+    )
+    df_detail["Part %"] = df_detail["Part %"].apply(lambda x: f"{x:.1f}%")
+    st.dataframe(df_detail, use_container_width=True, hide_index=True)
+
+    # ════════════════════════════════════════════
+    # 3. ANALYSES AVANCÉES ATS (tableau dark + onglets)
+    # ════════════════════════════════════════════
+    #display_advanced_ats_analysis(all_parsed)
+
+    # ════════════════════════════════════════════
+    # 4. ANALYSES AVANCÉES INSIGHTS (AMD, horaires, qualité)
+    # ════════════════════════════════════════════
+    display_eod_table(all_parsed)
+
+    # ════════════════════════════════════════════
+    # 5. BOUTON ANALYSE IA GEMINI (tout en bas)
+    # ════════════════════════════════════════════
+    st.markdown("---")
+    st.header(" Analyse IA — Gemini")
+
+    if not api_key_input:
+        st.info("👈 Entrez votre clé API Gemini dans la barre latérale pour activer les recommandations IA")
+
     col_b1, col_b2, col_b3 = st.columns([1, 2, 1])
     with col_b2:
         analyse_btn = st.button(
-            "🤖 ANALYSER AVEC GEMINI",
+            " ANALYSER AVEC GEMINI",
             type="primary",
             use_container_width=True,
             key="ats_analyse_btn",
-            disabled=not api_key_input  # désactivé si pas de clé
+            disabled=not api_key_input
         )
 
     if analyse_btn:
         summary = resumer_ats_pour_gemini(all_parsed)
-        with st.spinner("🤖 Gemini analyse vos fichiers ATS..."):
+        with st.spinner(" Gemini analyse vos fichiers ATS..."):
             resultat = analyser_ats_avec_gemini(api_key_input, summary)
         if resultat:
             st.balloons()
             st.session_state["ats_analyse_resultat"] = resultat
         else:
-            st.error("❌ Échec de l'analyse IA")
+            st.error(" Échec de l'analyse IA")
 
-    # ── Affichage résultats ───────────────────
+    # ── Résultats Gemini ─────────────────────
     if "ats_analyse_resultat" in st.session_state:
         r = st.session_state["ats_analyse_resultat"]
         st.markdown("---")
-        st.success("✅ Analyse terminée")
+        st.success(" Analyse terminée")
 
-        st.subheader("📌 Résumé global")
+        st.subheader(" Résumé global")
         col_r1, col_r2 = st.columns([3, 1])
         with col_r1:
             st.info(r.get("resume_global", "N/A"))
@@ -1122,18 +1726,18 @@ def render_ats_tab(api_key_input: str = None):
 
         col_pf1, col_pf2 = st.columns(2)
         with col_pf1:
-            st.subheader("✅ Points forts")
+            st.subheader(" Points forts")
             for pt in r.get("points_forts", []):
                 st.success(f"• {pt}")
         with col_pf2:
-            st.subheader("⚠️ Points faibles")
+            st.subheader(" Points faibles")
             for pt in r.get("points_faibles", []):
                 st.warning(f"• {pt}")
 
         if r.get("analyse_par_fichier"):
             st.markdown("---")
-            st.subheader("📁 Analyse par fichier")
-            qualite_color = {"bonne": "✅", "moyenne": "🟡", "faible": "🔴"}
+            st.subheader(" Analyse par fichier")
+            qualite_color = {"bonne": "", "moyenne": "🟡", "faible": "🔴"}
             for item in r["analyse_par_fichier"]:
                 q    = item.get("qualite", "moyenne").lower()
                 icon = qualite_color.get(q, "🔵")
@@ -1143,18 +1747,18 @@ def render_ats_tab(api_key_input: str = None):
 
         if r.get("actions_prioritaires"):
             st.markdown("---")
-            st.subheader("🚀 Actions prioritaires")
+            st.subheader(" Actions prioritaires")
             for action in r["actions_prioritaires"]:
                 st.markdown(f"""
 **👉 {action.get('action', '')}**  
-📌 Pourquoi : {action.get('pourquoi', '')}  
-🎯 Impact : {action.get('impact', '')}
+ Pourquoi : {action.get('pourquoi', '')}  
+ Impact : {action.get('impact', '')}
 """)
 
         st.markdown("---")
         col_h, col_p = st.columns(2)
         with col_h:
-            st.subheader("⏰ Recommandation horaire")
+            st.subheader(" Recommandation horaire")
             st.info(r.get("recommandation_horaire", "N/A"))
         with col_p:
             st.subheader("🔮 Prédiction")
