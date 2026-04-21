@@ -391,8 +391,8 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
         client_rempli = (df_fourn["code_postal_clean"] != '') & (df_fourn["code_postal_clean"] != 'nan')
         fournisseur_rempli = (df_fourn["codigo_postal_clean"] != '') & (df_fourn["codigo_postal_clean"] != 'nan')
         
-        taux_client = round(client_rempli.sum() / len(df_fourn) * 100, 1)
-        taux_fournisseur = round(fournisseur_rempli.sum() / len(df_fourn) * 100, 1)
+        taux_client = round(client_rempli.sum() / len(df_fourn) * 100, 1) if len(df_fourn) > 0 else 0.0
+        taux_fournisseur = round(fournisseur_rempli.sum() / len(df_fourn) * 100, 1) if len(df_fourn) > 0 else 0.0
         
         # Taux de correspondance (quand les deux sont remplis)
         les_deux_remplis = client_rempli & fournisseur_rempli

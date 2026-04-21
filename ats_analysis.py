@@ -572,7 +572,7 @@ def display_amd_analysis(amd: dict):
         textinfo='label+percent', textposition='outside', hole=0.3
     )])
     fig.update_layout(height=400, showlegend=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     if amd['recommandations']:
         st.markdown("###  Recommandations AMD")
@@ -876,7 +876,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                          text="taux_contact", hover_data=["contacts", "total_appels"])
             fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
             fig.update_layout(xaxis_title="ID Liste", yaxis_title="Taux de Contact (%)", showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
     with tab2:
         st.subheader(" Classement - Taux XFER hors PDROP")
@@ -892,7 +892,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                 fig.update_traces(texttemplate="%{text:.1f}%", textposition="outside")
                 fig.update_layout(title="Top 10 - Taux XFER hors PDROP",
                                   xaxis_title="ID Liste", yaxis_title="Taux XFER (%)", showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             with col2:
                 st.markdown("### Statistiques")
                 st.metric("Moyenne", f"{df_xfer['taux_xfer_hors_pdrop'].mean():.2f}%")
@@ -983,7 +983,7 @@ def display_advanced_ats_analysis(all_parsed: list):
             fig.update_layout(barmode="stack", xaxis_title="ID Liste", hovermode="x unified")
             fig.update_yaxes(title_text="Nombre d'appels",       secondary_y=False)
             fig.update_yaxes(title_text="Taux de recyclage (%)", secondary_y=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             df_rec_display = df_rec.copy()
             df_rec_display["taux_recyclage"] = df_rec_display["taux_recyclage"].apply(lambda x: f"{x:.1f}%")
@@ -1035,7 +1035,7 @@ def display_advanced_insights(all_parsed: list):
                               barmode='group', hovermode='x unified', height=400)
             fig.update_yaxes(title_text="Nombre d'appels",      secondary_y=False)
             fig.update_yaxes(title_text="Taux de contact (%)",  secondary_y=True)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         if timeslots.get('recommandations_horaires'):
             st.markdown("###  Recommandations Horaires")
@@ -1484,7 +1484,7 @@ def display_eod_table(all_parsed: list):
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
     else:
         st.warning(" Aucune donnée disponible pour le tableau EOD")

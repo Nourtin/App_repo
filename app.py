@@ -280,7 +280,7 @@ with tab1:
                 xaxis=dict(type="category"),
                 margin=dict(t=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.info("Colonne Timestamp absente.")
 
@@ -300,7 +300,7 @@ with tab1:
                 xaxis=dict(type="category"),
                 margin=dict(t=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.info("Colonne Timestamp absente.")
 
@@ -319,7 +319,7 @@ with tab1:
             )
             fig.update_traces(textinfo="percent+label")
             fig.update_layout(showlegend=False, margin=dict(t=10, b=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.info("Aucune donnée de classification valide.")
 
@@ -341,7 +341,7 @@ with tab1:
                 yaxis_title="Appels",
                 margin=dict(t=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.info("Colonne Timestamp absente.")
 
@@ -393,7 +393,7 @@ with tab2:
             )
             fig.update_traces(textposition="outside")
             fig.update_layout(yaxis_title="", xaxis_title="Appels", margin=dict(t=10))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         with col_b:
             st.subheader(" Taux d'appels qualifiés (%)")
@@ -410,7 +410,7 @@ with tab2:
                 yaxis_title="", xaxis_title="%",
                 margin=dict(t=10), coloraxis_showscale=False,
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         st.markdown("---")
 
@@ -425,7 +425,7 @@ with tab2:
         )
         fig.update_traces(textposition="outside")
         fig.update_layout(yaxis_title="", xaxis_title="Secondes", margin=dict(t=10))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
         st.markdown("---")
 
@@ -450,7 +450,7 @@ with tab2:
                 legend_title="Classification",
                 margin=dict(t=10),
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             with st.expander("📑 Voir le tableau détaillé"):
                 pivot = df_cls_fourn.pivot_table(
@@ -725,7 +725,7 @@ with tab3:
                 title="Taux de remplissage des codes postaux",
                 labels={"taux": "Taux (%)", "fournisseur": "Fournisseur", "source": "Source"}
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col_g2:
             st.subheader("Taux de correspondance par fournisseur")
@@ -739,7 +739,7 @@ with tab3:
                 labels={"taux_correspondance": "Taux de correspondance (%)", "fournisseur": "Fournisseur"}
             )
             fig.update_layout(coloraxis_showscale=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
     else:
         st.info("Données insuffisantes pour l'analyse par fournisseur")
     
@@ -835,7 +835,7 @@ with tab4:
                     )
                     fig.update_traces(texttemplate="%{text}%", textposition="outside")
                     fig.update_layout(coloraxis_showscale=False)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 
                 with col_g2:
                     st.subheader("📊 Volume d'appels par type")
@@ -851,7 +851,7 @@ with tab4:
                     )
                     fig.update_traces(textposition="outside")
                     fig.update_layout(coloraxis_showscale=False)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 
                 st.markdown("---")
                 
@@ -934,7 +934,7 @@ with tab4:
                         hole=0.3
                     )
                     fig.update_traces(textinfo="percent+label")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
                 else:
                     st.info("Aucune classification valide pour ce type")
             
@@ -978,7 +978,7 @@ with tab4:
                 color_discrete_sequence=PALETTE
             )
             fig.update_layout(xaxis_tickangle=-45, height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Version tableau
             with st.expander("📑 Voir le tableau détaillé"):
@@ -1060,7 +1060,7 @@ with tab4:
                 )
                 fig.update_traces(textinfo="percent+label")
                 fig.update_layout(showlegend=False, margin=dict(t=10, b=10))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
             with col_b:
                 st.subheader("Nombre d'appels par type")
@@ -1077,7 +1077,7 @@ with tab4:
                     yaxis_title="", xaxis_title="Appels",
                     coloraxis_showscale=False, margin=dict(t=10),
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
             st.dataframe(
                 df_tipo.rename(columns={
@@ -1186,7 +1186,7 @@ with tab5:
             fig.add_hline(y=df_h_raw["nb_appels"].mean(), line_dash="dash", line_color="red",
                           annotation_text="Moyenne")
             fig.update_layout(xaxis=dict(tickmode="linear", tick0=0, dtick=1))
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             st.dataframe(df_h_raw, use_container_width=True, hide_index=True)
         else:
             st.warning(" Impossible de calculer les appels par heure")
@@ -1215,7 +1215,7 @@ with tab5:
                         fig = px.line(df_h_ia, x="heure", y="taux", markers=True,
                                       title="Taux de classification par heure (IA)")
                         fig.add_hline(y=50, line_dash="dash", line_color="red")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
 
             if "recommandations" in resultat and "horaires" in resultat["recommandations"]:
                 st.info(f"💡 {resultat['recommandations']['horaires']}")
@@ -1253,7 +1253,7 @@ with tab5:
                 title="Appels par fournisseur"
             )
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         else:
             st.warning(" Colonne 'list_name' non trouvée dans les données")
 
@@ -1284,7 +1284,7 @@ with tab5:
                         x="taux_classification", y="nom", orientation="h",
                         color="taux_classification", color_continuous_scale="RdYlGn"
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
 
             if "recommandations" in resultat and "fournisseurs" in resultat["recommandations"]:
                 st.success(f"💡 {resultat['recommandations']['fournisseurs']}")
@@ -1325,7 +1325,7 @@ with tab5:
                     title="Top 10 - Appels par type logement"
                 )
                 fig.update_layout(showlegend=False)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             with col_g2:
                 fig2 = px.pie(
                     df_l_raw.head(10),
@@ -1364,7 +1364,7 @@ with tab5:
                             x="taux_classification", y="type", orientation="h",
                             color="taux_classification", color_continuous_scale="Greens"
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                     with col_g2:
                         fig2 = px.bar(
                             df_l_ia.head(10),

@@ -5,4 +5,4 @@ gspread
 google-auth
 numpy
 openpyxl
-google-generativeai
+google-genai

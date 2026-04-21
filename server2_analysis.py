@@ -256,7 +256,7 @@ def render_server2_section(server2_files: list):
             )
             fig.update_traces(textinfo="label+percent")
             fig.update_layout(showlegend=True, height=380)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         with col2:
             # Bar par statut brut (top 15)
@@ -343,7 +343,7 @@ def render_server2_section(server2_files: list):
             )
             fig.update_traces(textposition="outside")
             fig.update_layout(showlegend=False, xaxis_title="Agent")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
         with col2:
             fig2 = px.bar(
@@ -404,7 +404,7 @@ def render_server2_section(server2_files: list):
                 fig.update_xaxes(title_text="Heure")
                 fig.update_yaxes(title_text="Appels", secondary_y=False)
                 fig.update_yaxes(title_text="Taux succès (%)", secondary_y=True)
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
             with col2:
                 # Volume par date
@@ -479,7 +479,7 @@ def render_server2_section(server2_files: list):
             )
             fig.update_traces(textposition="outside")
             fig.update_layout(showlegend=False, xaxis_title="Nombre d'appels par lead")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
             # Leads les plus contactés
             st.markdown("#### Top 20 leads les plus contactés")
