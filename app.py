@@ -750,7 +750,7 @@ with tab3:
     df_non_corr = codes_postaux_non_correspondants(df)
     
     if not df_non_corr.empty:
-        st.write(f"**{len(df_non_corr)}** lignes où les codes postaux ne correspondent pas")
+        #st.write(f"**{len(df_non_corr)}** lignes où les codes postaux ne correspondent pas")
         
         cols_afficher = ["list_name", "code_postal", "codigo_postal", "code_postal_clean", "codigo_postal_clean"]
         cols_disponibles = [col for col in cols_afficher if col in df_non_corr.columns]

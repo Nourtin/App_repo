@@ -10,6 +10,7 @@ import glob
 import os
 from plotly.subplots import make_subplots
 from datetime import datetime
+from server2_analysis import *
 
 def time_to_seconds(t_str: str) -> int:
     if not t_str or t_str in ["0:00:00", "00:00:00"]:
@@ -1502,6 +1503,15 @@ def display_eod_table(all_parsed: list):
         with st.expander(" Structure des données parsées", expanded=False):
             if all_parsed:
                 st.json(all_parsed[0])
+# ─────────────────────────────────────────────
+# PATCH pour render_ats_tab() dans ats_analysis.py
+#
+# 1. Ajouter en haut du fichier ats_analysis.py :
+#    from server2_analysis import render_server2_section
+#
+# 2. Remplacer la fonction render_ats_tab() par la version ci-dessous
+# ─────────────────────────────────────────────
+
 def render_ats_tab(api_key_input: str = None):
     st.header(" Analyse des ATS par IA")
     st.markdown("---")
@@ -1513,183 +1523,206 @@ def render_ats_tab(api_key_input: str = None):
         # Ancien format
         old = glob.glob("data/report_*.csv")
         old = [f for f in old if "latest" not in f]
-
         # Nouveau format serveur 1
         server1 = glob.glob("data/server1_report_*.csv")
         server1 = [f for f in server1 if "latest" not in f]
-
         # Nouveau format serveur 2
         server2 = glob.glob("data/server2_report_*.csv")
         server2 = [f for f in server2 if "latest" not in f]
-
         return sorted(old), sorted(server1), sorted(server2)
 
     old_files, server1_files, server2_files = load_auto_files()
-    auto_files = old_files + server1_files + server2_files
+    all_server1 = old_files + server1_files  # fichiers ATS structurés (Serveur 1)
 
     if os.path.exists("data/last_update.txt"):
         with open("data/last_update.txt", "r") as f:
             last_update_str = f.read().strip()
         st.caption(f" Dernière mise à jour GitHub Actions : {last_update_str}")
 
-    all_files = []
+    # ── Résumé disponibilité ──────────────────
+    col_info1, col_info2, col_info3 = st.columns(3)
+    with col_info1:
+        st.caption(f"📁 Ancien format : {len(old_files)} fichier(s)")
+    with col_info2:
+        st.caption(f"🖥️ Serveur 1 : {len(server1_files)} fichier(s)")
+    with col_info3:
+        st.caption(f"🖥️ Serveur 2 : {len(server2_files)} fichier(s)")
 
-    if auto_files:
-        # Grouper par source
-        options_grouped = {}
-        if old_files:
-            options_grouped["📁 Ancien format"] = [os.path.basename(f) for f in old_files]
-        if server1_files:
-            options_grouped["🖥️ Serveur 1"] = [os.path.basename(f) for f in server1_files]
-        if server2_files:
-            options_grouped["🖥️ Serveur 2"] = [os.path.basename(f) for f in server2_files]
+    # ════════════════════════════════════════════
+    # SECTION SERVEUR 1 / ATS
+    # ════════════════════════════════════════════
+    st.markdown("---")
+    st.subheader("🖥️ Serveur 1 — Fichiers ATS")
 
-        noms_fichiers = [os.path.basename(f) for f in auto_files]
+    all_files_s1 = []
 
-        # Afficher le détail par serveur
-        for label, noms in options_grouped.items():
-            st.caption(f"{label} : {len(noms)} fichier(s)")
-
-        fichiers_selectionnes = st.multiselect(
-            " Fichiers disponibles (repo GitHub)",
-            options=noms_fichiers,
-            default=noms_fichiers,
-            placeholder="Choisissez un ou plusieurs fichiers..."
+    if all_server1:
+        noms_s1 = [os.path.basename(f) for f in all_server1]
+        fichiers_sel_s1 = st.multiselect(
+            "Fichiers disponibles Serveur 1 (repo GitHub)",
+            options=noms_s1,
+            default=noms_s1,
+            placeholder="Choisissez un ou plusieurs fichiers...",
+            key="s1_multiselect",
         )
-
-        for f in auto_files:
-            if os.path.basename(f) in fichiers_selectionnes:
+        for f in all_server1:
+            if os.path.basename(f) in fichiers_sel_s1:
                 with open(f, "r", encoding="utf-8", errors="replace") as file:
                     content = file.read()
-                    all_files.append({"name": os.path.basename(f), "content": content})
-
-        if fichiers_selectionnes:
-            st.success(f" {len(fichiers_selectionnes)} fichier(s) sélectionné(s)")
+                    all_files_s1.append({"name": os.path.basename(f), "content": content})
+        if fichiers_sel_s1:
+            st.success(f" {len(fichiers_sel_s1)} fichier(s) sélectionné(s)")
         else:
-            st.warning(" Aucun fichier sélectionné")
+            st.warning(" Aucun fichier Serveur 1 sélectionné")
     else:
-        st.info("📭 Aucun fichier trouvé dans le repo (data/report_*.csv / server1_report_*.csv / server2_report_*.csv)")
+        st.info("📭 Aucun fichier Serveur 1 trouvé dans le repo")
+
+    # Upload manuel Serveur 1
     uploaded_files = st.file_uploader(
-        "➕ Ajouter des fichiers CSV manuellement",
+        "➕ Ajouter des fichiers ATS manuellement",
         type=["csv", "txt"],
         accept_multiple_files=True,
-        key="ats_files"
+        key="ats_files",
     )
     if uploaded_files:
         for f in uploaded_files:
             content = f.read().decode("utf-8", errors="replace")
-            all_files.append({"name": f.name, "content": content})
+            all_files_s1.append({"name": f.name, "content": content})
 
-    # ── Si aucun fichier : message et on s'arrête (sans st.stop qui casse tout)
-    if not all_files:
-        st.info("📂 Sélectionnez ou importez au moins un fichier CSV ATS pour commencer")
-        return
+    # ── Parsing & analyses Serveur 1 ──────────
+    if not all_files_s1:
+        st.info("📂 Sélectionnez ou importez au moins un fichier ATS Serveur 1 pour commencer")
+    else:
+        all_parsed = []
+        all_dfs    = []
+        for f in all_files_s1:
+            try:
+                parsed = parse_ats_csv(f["content"], f["name"])
+                df_f   = ats_to_dataframe(parsed)
+                all_parsed.append(parsed)
+                if not df_f.empty:
+                    all_dfs.append(df_f)
+            except Exception as e:
+                st.warning(f" Erreur lecture {f['name']} : {e}")
 
-    # ── Parsing ───────────────────────────────
-    all_parsed = []
-    all_dfs    = []
-    for f in all_files:
-        try:
-            parsed = parse_ats_csv(f["content"], f["name"])
-            df_f   = ats_to_dataframe(parsed)
-            all_parsed.append(parsed)
-            if not df_f.empty:
-                all_dfs.append(df_f)
-        except Exception as e:
-            st.warning(f" Erreur lecture {f['name']} : {e}")
+        df_combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
-    df_combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
+        if df_combined.empty:
+            st.warning(" Aucune donnée ATS exploitable dans les fichiers Serveur 1.")
+        else:
+            # ── Aperçu ────────────────────────
+            with st.expander(" Aperçu des données parsées", expanded=True):
+                col1, col2, col3, col4 = st.columns(4)
+                col1.metric("Fichiers chargés",  len(all_parsed))
+                col2.metric("Total appels",      f"{df_combined['Appels'].sum():,}")
+                col3.metric("Campagnes",         sum(len(p["campaigns"]) for p in all_parsed))
+                col4.metric("Listes actives",    len(df_combined["Liste"].unique()))
+                st.dataframe(
+                    df_combined.sort_values("Appels", ascending=False),
+                    use_container_width=True, height=300,
+                )
 
-    if df_combined.empty:
-        st.warning(" Aucune donnée exploitable dans les fichiers sélectionnés.")
-        return
+            # ── Visualisation rapide ──────────
+            st.markdown("---")
+            st.subheader(" Visualisation rapide — Serveur 1")
+
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            with col_m1:
+                st.metric(" Total Appels", f"{df_combined['Appels'].sum():,}")
+            with col_m2:
+                st.metric(" Campagnes", df_combined["Campagne"].nunique())
+            with col_m3:
+                st.metric(" Listes", df_combined["Liste"].nunique())
+            with col_m4:
+                total_sec = df_combined["Durée"].apply(time_to_seconds).sum()
+                h = total_sec // 3600
+                m = (total_sec % 3600) // 60
+                st.metric("⏱️ Durée totale", f"{h}h {m}m")
+
+            st.markdown("---")
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                df_disp = (df_combined.groupby("Disposition")["Appels"]
+                           .sum().reset_index()
+                           .sort_values("Appels", ascending=False)
+                           .head(10))
+                fig1 = px.bar(df_disp, x="Appels", y="Disposition", orientation="h",
+                              title="Top 10 Dispositions",
+                              color="Appels", color_continuous_scale="Blues")
+                fig1.update_layout(showlegend=False)
+                st.plotly_chart(fig1, use_container_width=True)
+            with col_g2:
+                df_liste = (df_combined.groupby("Liste")["Appels"]
+                            .sum().reset_index()
+                            .sort_values("Appels", ascending=False)
+                            .head(10))
+                fig2 = px.bar(df_liste, x="Appels", y="Liste", orientation="h",
+                              title="Top 10 Listes par appels",
+                              color="Appels", color_continuous_scale="Greens")
+                fig2.update_layout(showlegend=False)
+                st.plotly_chart(fig2, use_container_width=True)
+
+            st.markdown("---")
+            st.subheader(" Détail par Liste et Disposition")
+            df_detail = (df_combined.groupby(["Campagne", "Liste", "Disposition"])
+                         .agg(Appels=("Appels", "sum"))
+                         .reset_index()
+                         .sort_values(["Campagne", "Liste", "Appels"], ascending=[True, True, False]))
+            df_detail["Part %"] = (
+                df_detail.groupby("Liste")["Appels"]
+                .transform(lambda x: (x / x.sum() * 100).round(1))
+            )
+            df_detail["Part %"] = df_detail["Part %"].apply(lambda x: f"{x:.1f}%")
+            st.dataframe(df_detail, use_container_width=True, hide_index=True)
+
+            # ── EOD Table ─────────────────────
+            display_eod_table(all_parsed)
+
+           
+            
 
     # ════════════════════════════════════════════
-    # 1. APERÇU DONNÉES PARSÉES
+    # SECTION SERVEUR 2 — vicidial_log
     # ════════════════════════════════════════════
-    with st.expander(" Aperçu des données parsées", expanded=True):
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Fichiers chargés",  len(all_parsed))
-        col2.metric("Total appels",      f"{df_combined['Appels'].sum():,}")
-        col3.metric("Campagnes",         sum(len(p["campaigns"]) for p in all_parsed))
-        col4.metric("Listes actives",    len(df_combined["Liste"].unique()))
-        st.dataframe(
-            df_combined.sort_values("Appels", ascending=False),
-            use_container_width=True, height=300
+    st.markdown("---")
+    st.subheader("🖥️ Serveur 2 — Sélectionner les fichiers")
+
+    selected_s2_paths = []
+    if server2_files:
+        noms_s2 = [os.path.basename(f) for f in server2_files]
+        fichiers_sel_s2 = st.multiselect(
+            "Fichiers disponibles Serveur 2 (repo GitHub)",
+            options=noms_s2,
+            default=noms_s2,
+            placeholder="Choisissez un ou plusieurs fichiers...",
+            key="s2_multiselect",
         )
+        selected_s2_paths = [f for f in server2_files if os.path.basename(f) in fichiers_sel_s2]
+        if fichiers_sel_s2:
+            st.success(f" {len(fichiers_sel_s2)} fichier(s) Serveur 2 sélectionné(s)")
+        else:
+            st.warning(" Aucun fichier Serveur 2 sélectionné")
+    else:
+        st.info("📭 Aucun fichier Serveur 2 trouvé dans le repo")
 
-    # ════════════════════════════════════════════
-    # 2. VISUALISATION RAPIDE
-    # ════════════════════════════════════════════
-    st.markdown("---")
-    st.subheader(" Visualisation rapide")
-
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        st.metric(" Total Appels", f"{df_combined['Appels'].sum():,}")
-    with col_m2:
-        st.metric(" Campagnes", df_combined["Campagne"].nunique())
-    with col_m3:
-        st.metric(" Listes", df_combined["Liste"].nunique())
-    with col_m4:
-        total_sec = df_combined["Durée"].apply(time_to_seconds).sum()
-        h = total_sec // 3600
-        m = (total_sec % 3600) // 60
-        st.metric("⏱️ Durée totale", f"{h}h {m}m")
-
-    st.markdown("---")
-    col_g1, col_g2 = st.columns(2)
-    with col_g1:
-        df_disp = (df_combined.groupby("Disposition")["Appels"]
-                   .sum().reset_index()
-                   .sort_values("Appels", ascending=False)
-                   .head(10))
-        fig1 = px.bar(df_disp, x="Appels", y="Disposition", orientation="h",
-                      title="Top 10 Dispositions",
-                      color="Appels", color_continuous_scale="Blues")
-        fig1.update_layout(showlegend=False)
-        st.plotly_chart(fig1, use_container_width=True)
-    with col_g2:
-        df_liste = (df_combined.groupby("Liste")["Appels"]
-                    .sum().reset_index()
-                    .sort_values("Appels", ascending=False)
-                    .head(10))
-        fig2 = px.bar(df_liste, x="Appels", y="Liste", orientation="h",
-                      title="Top 10 Listes par appels",
-                      color="Appels", color_continuous_scale="Greens")
-        fig2.update_layout(showlegend=False)
-        st.plotly_chart(fig2, use_container_width=True)
-
-    col_g3, col_g4 = st.columns(2)
-    
-
-
-    st.markdown("---")
-    st.subheader(" Détail par Liste et Disposition")
-    df_detail = (df_combined.groupby(["Campagne", "Liste", "Disposition"])
-                 .agg(Appels=("Appels", "sum"))
-                 .reset_index()
-                 .sort_values(["Campagne", "Liste", "Appels"], ascending=[True, True, False]))
-    df_detail["Part %"] = (
-        df_detail.groupby("Liste")["Appels"]
-        .transform(lambda x: (x / x.sum() * 100).round(1))
+    # Upload manuel Serveur 2
+    uploaded_s2 = st.file_uploader(
+        "➕ Ajouter des fichiers Serveur 2 manuellement",
+        type=["csv"],
+        accept_multiple_files=True,
+        key="s2_files_upload",
     )
-    df_detail["Part %"] = df_detail["Part %"].apply(lambda x: f"{x:.1f}%")
-    st.dataframe(df_detail, use_container_width=True, hide_index=True)
+    if uploaded_s2:
+        import tempfile
+        for uf in uploaded_s2:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+            tmp.write(uf.read())
+            tmp.close()
+            selected_s2_paths.append(tmp.name)
 
-    # ════════════════════════════════════════════
-    # 3. ANALYSES AVANCÉES ATS (tableau dark + onglets)
-    # ════════════════════════════════════════════
-    #display_advanced_ats_analysis(all_parsed)
+    # Lancer l'analyse Serveur 2
+    render_server2_section(selected_s2_paths)
 
-    # ════════════════════════════════════════════
-    # 4. ANALYSES AVANCÉES INSIGHTS (AMD, horaires, qualité)
-    # ════════════════════════════════════════════
-    display_eod_table(all_parsed)
-
-    # ════════════════════════════════════════════
-    # 5. BOUTON ANALYSE IA GEMINI (tout en bas)
-    # ════════════════════════════════════════════
     st.markdown("---")
     st.header(" Analyse IA — Gemini")
 
@@ -1705,19 +1738,43 @@ def render_ats_tab(api_key_input: str = None):
             key="ats_analyse_btn",
             disabled=not api_key_input
         )
-
     if analyse_btn:
-        summary = resumer_ats_pour_gemini(all_parsed)
+        summary = resumer_ats_pour_gemini(all_parsed) if all_parsed else {"fichiers": []}
+        
+        if selected_s2_paths:
+            dfs_s2 = []
+            for path in selected_s2_paths:
+                try:
+                    with open(path, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read()
+                    df_raw = parse_server2_csv(content, os.path.basename(path))
+                    df_norm = normalize_server2(df_raw)
+                    if not df_norm.empty:
+                        dfs_s2.append(df_norm)
+                except:
+                    pass
+            if dfs_s2:
+                df_s2 = pd.concat(dfs_s2, ignore_index=True)
+                summary["serveur2"] = {
+                    "total_appels": len(df_s2),
+                    "agents": df_s2["user"].nunique() if "user" in df_s2.columns else 0,
+                    "top_statuts": df_s2["status"].value_counts().head(10).to_dict() if "status" in df_s2.columns else {},
+                    "campagnes": df_s2["campaign_id"].unique().tolist() if "campaign_id" in df_s2.columns else [],
+                    "duree_moy_sec": int(df_s2["length_in_sec"].mean()) if "length_in_sec" in df_s2.columns else 0,
+                }
+
         with st.spinner(" Gemini analyse vos fichiers ATS..."):
             resultat = analyser_ats_avec_gemini(api_key_input, summary)
+        
         if resultat:
             st.balloons()
             st.session_state["ats_analyse_resultat"] = resultat
         else:
             st.error(" Échec de l'analyse IA")
+            st.session_state["ats_analyse_resultat"] = None
 
     # ── Résultats Gemini ─────────────────────
-    if "ats_analyse_resultat" in st.session_state:
+    if "ats_analyse_resultat" in st.session_state and st.session_state["ats_analyse_resultat"] is not None:
         r = st.session_state["ats_analyse_resultat"]
         st.markdown("---")
         st.success(" Analyse terminée")
@@ -1760,22 +1817,6 @@ def render_ats_tab(api_key_input: str = None):
  Impact : {action.get('impact', '')}
 """)
 
-        st.markdown("---")
-        col_h, col_p = st.columns(2)
-        with col_h:
-            st.subheader(" Recommandation horaire")
-            st.info(r.get("recommandation_horaire", "N/A"))
-        with col_p:
-            st.subheader("🔮 Prédiction")
-            st.info(r.get("prediction", "N/A"))
-
-        st.markdown("---")
-        st.download_button(
-            "📥 Exporter l'analyse JSON",
-            data=json.dumps(r, ensure_ascii=False, indent=2),
-            file_name="analyse_ats_ia.json",
-            mime="application/json",
-            use_container_width=True
-        )
+        
 
     st.markdown("---")
