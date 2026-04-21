@@ -806,6 +806,13 @@ def analyze_list_quality(all_parsed: list) -> dict:
 # (tableau dark theme + onglets existants)
 # ─────────────────────────────────────────────
 
+"""
+PATCH pour ats_analysis.py
+
+Remplacez la fonction display_advanced_ats_analysis() par celle ci-dessous.
+Le bug principal est : st.markdown() appelé VIDE (sans argument) → crash immédiat.
+"""
+
 def display_advanced_ats_analysis(all_parsed: list):
     st.markdown("---")
     st.header(" Analyses Avancées ATS")
@@ -813,7 +820,6 @@ def display_advanced_ats_analysis(all_parsed: list):
     with st.spinner(" Calcul des métriques avancées..."):
         analysis = analyze_ats_performance(all_parsed)
 
-    # ── KPIs globaux ──────────────────────────
     st.subheader(" Indicateurs Clés")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -827,12 +833,31 @@ def display_advanced_ats_analysis(all_parsed: list):
 
     st.divider()
 
-    # ── TABLEAU DARK THEME ────────────────────
     st.subheader("🖥️ Performance × Qualification")
 
     if analysis["liste_performance"]:
-        # Injecter le CSS une seule fois
-        st.markdown()
+        # ← CORRECTION : st.markdown() vide supprimé, remplacé par le CSS inline
+        css = """
+        <style>
+        .perf-table-wrap { overflow-x: auto; }
+        .perf { width: 100%; border-collapse: collapse; font-family: monospace; font-size: 13px; }
+        .perf th { background: #161b22; color: #8b949e; padding: 8px; text-align: left; border-bottom: 1px solid #30363d; }
+        .perf td { padding: 7px 10px; border-bottom: 1px solid #21262d; color: #c9d1d9; }
+        .perf tr:hover td { background: #1c2128; }
+        .val-blue { color: #58a6ff; font-weight: bold; }
+        .val-orange { color: #f0883e; font-weight: bold; }
+        .val-yellow { color: #e3b341; }
+        .val-green { color: #3fb950; }
+        .val-dim { color: #8b949e; }
+        .badge-adc { background: #da3633; color: white; border-radius: 3px; padding: 1px 5px; font-size: 11px; margin-left: 5px; }
+        .rank-gold { color: #e3b341; margin-right: 4px; }
+        .rank-silver { color: #8b949e; margin-right: 4px; }
+        .rank-bullet { color: #30363d; margin-right: 4px; }
+        .perf-title { color: #58a6ff; font-family: monospace; font-size: 14px; margin-bottom: 8px; }
+        .perf-title span { color: #e3b341; }
+        </style>
+        """
+        st.markdown(css, unsafe_allow_html=True)
 
         from datetime import date
         today_str = date.today().strftime("%d/%m/%Y")
@@ -849,7 +874,6 @@ def display_advanced_ats_analysis(all_parsed: list):
 
     st.divider()
 
-    # ── Onglets détaillés ─────────────────────
     tab1, tab2, tab3, tab4 = st.tabs([
         " Performance par Liste", " Classement XFER",
         " Analyse ADC", "♻️ Potentiel Recyclage"
@@ -867,7 +891,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                                    "XFER", "XFER %", "ADC", "ADC %", "AA", "NA", "Recyclable", "Recyclage %"]
             for col in ["Contact %", "XFER %", "ADC %", "Recyclage %"]:
                 df_display[col] = df_display[col].apply(lambda x: f"{x:.1f}%")
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_display, width='stretch', hide_index=True)
 
             st.subheader("Top 10 - Taux de Contact")
             top_contact = df_perf.nlargest(10, "taux_contact")[["liste_id", "taux_contact", "contacts", "total_appels"]]
@@ -907,7 +931,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                 "liste_id": "ID", "fichier": "Fichier", "campagne": "Campagne",
                 "taux_xfer_hors_pdrop": "XFER %", "xfer": "Nb XFER", "total_hors_pdrop": "Total hors PDROP"
             })
-            st.dataframe(df_xfer_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_xfer_display, width='stretch', hide_index=True)
 
     with tab3:
         st.subheader(" Analyse ADC - Numéros invalides")
@@ -955,7 +979,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                 "liste_id": "ID", "fichier": "Fichier", "campagne": "Campagne",
                 "adc": "Nb ADC", "total": "Total Appels", "taux_adc": "Taux ADC %"
             })
-            st.dataframe(df_adc_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_adc_display, width='stretch', hide_index=True)
 
     with tab4:
         st.subheader("♻️ Potentiel de Recyclage - Répondeurs + Non-réponse")
@@ -978,8 +1002,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                                  name="NA (Non-réponse)", marker_color="red"), secondary_y=False)
             fig.add_trace(go.Scatter(x=df_rec["liste_id"].astype(str), y=df_rec["taux_recyclage"],
                                      name="Taux %", mode="lines+markers",
-                                     line=dict(color="green", width=2), marker=dict(size=8)),
-                          secondary_y=True)
+                                     line=dict(color="green", width=2), marker=dict(size=8)), secondary_y=True)
             fig.update_layout(barmode="stack", xaxis_title="ID Liste", hovermode="x unified")
             fig.update_yaxes(title_text="Nombre d'appels",       secondary_y=False)
             fig.update_yaxes(title_text="Taux de recyclage (%)", secondary_y=True)
@@ -992,7 +1015,7 @@ def display_advanced_ats_analysis(all_parsed: list):
                 "aa": "AA", "na": "NA", "total_recyclable": "Total Recyclable",
                 "taux_recyclage": "Taux %", "total_appels": "Total Appels"
             })
-            st.dataframe(df_rec_display, use_container_width=True, hide_index=True)
+            st.dataframe(df_rec_display, width='stretch', hide_index=True)
 
 
 # ─────────────────────────────────────────────
