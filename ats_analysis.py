@@ -1598,7 +1598,7 @@ def render_ats_tab(api_key_input: str = None):
         fichiers_sel_s1 = st.multiselect(
             "Fichiers disponibles Serveur 1 (repo GitHub)",
             options=noms_s1,
-            default=noms_s1,
+            default=[],
             placeholder="Choisissez un ou plusieurs fichiers...",
             key="s1_multiselect",
         )
@@ -1730,7 +1730,7 @@ def render_ats_tab(api_key_input: str = None):
         fichiers_sel_s2 = st.multiselect(
             "Fichiers disponibles Serveur 2 (repo GitHub)",
             options=noms_s2,
-            default=noms_s2,
+            default=[],
             placeholder="Choisissez un ou plusieurs fichiers...",
             key="s2_multiselect",
         )
