@@ -1,28 +1,32 @@
 import streamlit as st
-st.set_page_config(
-    page_title="Call Center Dashboard",
-    page_icon="📞",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-st.write("DEBUG 1: App Initialisée")
+st.set_page_config(page_title="Call Center", layout="wide")
+
+st.write("🔧 **Diagnostic de démarrage en cours...**")
+st.write("1️⃣ Chargement de Streamlit... OK")
 
 import pandas as pd
+st.write("2️⃣ Chargement de Pandas... OK")
+
 import plotly.express as px
-import json
-import plotly.graph_objects as go
+st.write("3️⃣ Chargement de Plotly... OK")
+
+try:
+    from analyse import kpi_globaux
+    st.write("4️⃣ Chargement de analyse.py... OK")
+except Exception as e:
+    st.error(f"❌ ERREUR dans analyse.py : {e}")
+    st.stop()
+
+try:
+    from ats_analysis import render_ats_tab
+    st.write("5️⃣ Chargement de ats_analysis.py... OK")
+except Exception as e:
+    st.error(f"❌ ERREUR dans ats_analysis.py : {e}")
+    st.stop()
 
 from google_selector import list_sheets, choisir_feuille
 from ai_recommendation import GeminiAdvisor
-from analyse import (
-    kpi_globaux, appels_par_jour, appels_par_mois, appels_par_heure,
-    repartition_classification, appels_par_fournisseur, classification_par_fournisseur,
-    taux_remplissage_code_postal, comparer_codes_postaux, analyse_fiabilite_par_fournisseur,
-    codes_postaux_non_correspondants, analyse_par_type_logement,
-    comparer_types_logement, classification_detaillee_par_type, appels_par_piso_casa,
-    analyse_par_type_logement
-)
-from ats_analysis import render_ats_tab
+st.write("✅ **Tous les modules sont chargés !**")
 
 PALETTE = px.colors.qualitative.Set2
 try:
