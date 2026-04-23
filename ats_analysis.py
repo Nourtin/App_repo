@@ -807,12 +807,6 @@ def analyze_list_quality(all_parsed: list) -> dict:
 # (tableau dark theme + onglets existants)
 # ─────────────────────────────────────────────
 
-"""
-PATCH pour ats_analysis.py
-
-Remplacez la fonction display_advanced_ats_analysis() par celle ci-dessous.
-Le bug principal est : st.markdown() appelé VIDE (sans argument) → crash immédiat.
-"""
 
 def display_advanced_ats_analysis(all_parsed: list):
     st.markdown("---")
@@ -1532,14 +1526,6 @@ def display_eod_table(all_parsed: list):
         with st.expander(" Structure des données parsées", expanded=False):
             if all_parsed:
                 st.json(all_parsed[0])
-# ─────────────────────────────────────────────
-# PATCH pour render_ats_tab() dans ats_analysis.py
-#
-# 1. Ajouter en haut du fichier ats_analysis.py :
-#    from server2_analysis import render_server2_section
-#
-# 2. Remplacer la fonction render_ats_tab() par la version ci-dessous
-# ─────────────────────────────────────────────
 
 def render_ats_tab(api_key_input: str = None):
     st.header(" Analyse des ATS par IA")
@@ -1715,8 +1701,11 @@ def render_ats_tab(api_key_input: str = None):
             # ── EOD Table ─────────────────────
             display_eod_table(all_parsed)
 
-           
-            
+            # ── Analyses Avancées ─────────────
+            display_advanced_ats_analysis(all_parsed)
+
+            # ── Insights Avancés ──────────────
+            display_advanced_insights(all_parsed)
 
     # ════════════════════════════════════════════
     # SECTION SERVEUR 2 — vicidial_log
