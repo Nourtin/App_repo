@@ -1445,7 +1445,7 @@ def display_eod_table(all_parsed: list):
                 st.json(all_parsed[0])
 
 
-@st.cache_data(ttl=300)
+
 def render_ats_tab(api_key_input: str = None):
     st.header(" Analyse des ATS par IA")
     st.markdown("---")
