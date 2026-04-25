@@ -1138,7 +1138,7 @@ def resumer_ats_pour_gemini(all_parsed: list) -> dict:
 def analyser_ats_avec_gemini(api_key: str, summary: dict):
     try:
         genai.configure(api_key=api_key)
-        model_name = "gemini-2.0-flash"
+        model_name = "gemini-3-flash-preview"
         model = genai.GenerativeModel(model_name)
     except Exception as e:
         st.error(f" Erreur connexion Gemini: {e}")
