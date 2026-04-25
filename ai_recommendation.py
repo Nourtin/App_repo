@@ -1,25 +1,22 @@
 # ai_recommendation.py
 import streamlit as st
 import pandas as pd
-try:
-    from google import genai
-except ImportError:
-    genai = None
+import google.generativeai as genai
 import json
 import re
 
 
 class GeminiAdvisor:
     def __init__(self, api_key=None):
+        self.model = None
+        self.is_configured = False
+
         if not api_key:
-            self.model = None
-            self.is_configured = False
             return
 
         try:
             genai.configure(api_key=api_key)
-            self.model_name = "gemini-2.0-flash"
-            self.model = genai.GenerativeModel(self.model_name)
+            self.model = genai.GenerativeModel("gemini-1.5-flash")
             self.is_configured = True
 
         except Exception as e:
@@ -28,7 +25,7 @@ class GeminiAdvisor:
             self.is_configured = False
 
     def analyser_tous_les_volets(self, df):
-        if not self.is_configured:
+        if not self.is_configured or self.model is None:
             return None
 
         contexte = self._preparer_contexte_complet(df)
@@ -36,17 +33,10 @@ class GeminiAdvisor:
 
         try:
             response = self.model.generate_content(prompt)
-            recommandations_ia = self._parser_reponse(response.text)
+            return self._parser_reponse(response.text)
 
-            if recommandations_ia is None:
-                return None
-
-            return {
-                **contexte,
-                **recommandations_ia
-            }
         except Exception as e:
-            st.error(f"Erreur API Gemini: {str(e)}")
+            st.error(f"❌ Erreur IA: {str(e)}")
             return None
 
     def _preparer_contexte_complet(self, df):
@@ -59,7 +49,6 @@ class GeminiAdvisor:
 
         non_utiles = ["", "nan", "none", "non trouvé", "non trouve"]
 
-        # Analyse fournisseurs
         if "list_name" in df.columns:
             for fournisseur in df["list_name"].dropna().unique()[:10]:
                 df_f = df[df["list_name"] == fournisseur]
@@ -75,7 +64,6 @@ class GeminiAdvisor:
                     "taux_classification": taux
                 })
 
-        # Analyse horaire
         if "Timestamp" in df.columns and "Classification" in df.columns:
             df_time = df.copy()
             df_time["datetime"] = pd.to_datetime(df_time["Timestamp"], errors="coerce", dayfirst=True)
@@ -106,7 +94,6 @@ class GeminiAdvisor:
                 "performance_par_heure": perf_heure
             }
 
-        # Analyse logements
         if "tipo_vivienda" in df.columns and "Classification" in df.columns:
             df_log = df[df["tipo_vivienda"].notna()]
             df_log = df_log[df_log["tipo_vivienda"].astype(str).str.strip() != ""]
@@ -125,7 +112,7 @@ class GeminiAdvisor:
         return contexte
 
     def _construire_prompt(self, contexte):
-        prompt = f"""
+        return f"""
 Tu es un expert en centres d'appels. Analyse ces données et fournis des recommandations actionnables.
 
 Total appels: {contexte.get('total_appels', 0)}
@@ -149,7 +136,6 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
     "prediction": "prédiction pour le mois prochain"
 }}
 """
-        return prompt
 
     def _parser_reponse(self, response_text):
         try:
@@ -166,6 +152,7 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
             st.error("Aucun JSON trouvé dans la réponse Gemini")
             st.code(response_text[:500])
             return None
+
         except json.JSONDecodeError as e:
             st.error(f"Erreur parsing JSON: {str(e)}")
             st.code(response_text[:500])
