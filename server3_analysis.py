@@ -1,4 +1,4 @@
-#server2_analysis.py
+#server3_analysis.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -33,7 +33,7 @@ def classify_status(status: str) -> str:
         return "🔵 Autre"
 
 
-def parse_server2_csv(content: str, filename: str) -> pd.DataFrame:
+def parse_server3_csv(content: str, filename: str) -> pd.DataFrame:
     from io import StringIO
     try:
         first_line = content.splitlines()[0] if content.strip() else ""
@@ -48,7 +48,7 @@ def parse_server2_csv(content: str, filename: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def normalize_server2(df: pd.DataFrame) -> pd.DataFrame:
+def normalize_server3(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
     df = df.copy()
@@ -103,21 +103,21 @@ def fmt_sec(sec: int) -> str:
     return f"{s}s"
 
 
-def render_server2_section(server2_files: list):
+def render_server3_section(server3_files: list):
     st.markdown("---")
     st.header("🖥️ Serveur 2 — Analyses vicidial_log")
 
-    if not server2_files:
+    if not server3_files:
         st.info("📭 Aucun fichier Serveur 2 sélectionné.")
         return
 
     dfs = []
-    for path in server2_files:
+    for path in server3_files:
         try:
             with open(path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read()
-            df_raw  = parse_server2_csv(content, os.path.basename(path))
-            df_norm = normalize_server2(df_raw)
+            df_raw  = parse_server3_csv(content, os.path.basename(path))
+            df_norm = normalize_server3(df_raw)
             if not df_norm.empty:
                 dfs.append(df_norm)
         except Exception as e:
@@ -361,7 +361,7 @@ def render_server2_section(server2_files: list):
 
         csv = df_filtered.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
         st.download_button("📥 Exporter les données filtrées (CSV)", data=csv,
-                           file_name=f"server2_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                           file_name=f"server3_export_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                            mime="text/csv")
 
 
