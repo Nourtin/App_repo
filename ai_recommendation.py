@@ -16,7 +16,7 @@ class GeminiAdvisor:
 
         try:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel("gemini-1.5-flash")
+            self.model = genai.GenerativeModel("gemini-2.0-flash")
             self.is_configured = True
 
         except Exception as e:
