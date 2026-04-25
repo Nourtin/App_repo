@@ -24,7 +24,7 @@ from analyse import (
 from ats_analysis import render_ats_tab
 
 PALETTE = px.colors.qualitative.Set2
-genai.configure(api_key="TA_CLE")
+genai.configure(api_key="api_key_input")
 for m in genai.list_models():
     print(m.name)
 # google-generativeai is used via ai_recommendation.py and ats_analysis.py
