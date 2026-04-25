@@ -1,10 +1,7 @@
 # ats_analysis.py
 import streamlit as st
 import pandas as pd
-try:
-    from google import genai
-except ImportError:
-    genai = None
+import google.generativeai as genai
 import json
 import re
 import plotly.graph_objects as go
@@ -1138,12 +1135,13 @@ def resumer_ats_pour_gemini(all_parsed: list) -> dict:
     return summary
 
 
-def analyser_ats_avec_gemini(api_key: str, summary: dict) -> dict | None:
+def analyser_ats_avec_gemini(api_key: str, summary: dict):
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
+        model_name = "gemini-1.5-flash"
+        model = genai.GenerativeModel(model_name)
     except Exception as e:
-        st.error(f"Erreur connexion Gemini: {e}")
+        st.error(f" Erreur connexion Gemini: {e}")
         return None
 
     prompt = f"""
@@ -1182,10 +1180,7 @@ Réponds UNIQUEMENT en JSON valide, sans texte avant ou après, sans balises mar
 }}
 """
     try:
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         text = re.sub(r'^```json\s*', '', text)
         text = re.sub(r'^```\s*',     '', text)
@@ -1453,7 +1448,7 @@ def render_ats_tab(api_key_input: str = None):
     st.markdown("---")
 
     st.subheader("📤 Sélectionner les fichiers ATS")
-
+    @st.cache_data(ttl=300)
     def load_auto_files():
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "data")
@@ -1618,7 +1613,7 @@ def render_ats_tab(api_key_input: str = None):
         fichiers_sel_s2 = st.multiselect(
             "Fichiers disponibles Serveur 2 (repo GitHub)",
             options=noms_s2,
-            default=[],
+            default=noms_s2,
             placeholder="Choisissez un ou plusieurs fichiers...",
             key="s2_multiselect",
         )
