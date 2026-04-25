@@ -1640,6 +1640,42 @@ def render_ats_tab(api_key_input: str = None):
             selected_s2_paths.append(tmp.name)
 
     render_server2_section(selected_s2_paths)
+    st.markdown("---")
+    st.subheader("🖥️ server 3 — Sélectionner les fichiers")
+
+    selected_s3_paths = []
+    if server3_files:
+        noms_s3 = [os.path.basename(f) for f in server3_files]
+        fichiers_sel_s3 = st.multiselect(
+            "Fichiers disponibles server 3 (repo GitHub)",
+            options=noms_s3,
+            default=noms_s3,
+            placeholder="Choisissez un ou plusieurs fichiers...",
+            key="s3_multiselect",
+        )
+        selected_s3_paths = [f for f in server3_files if os.path.basename(f) in fichiers_sel_s3]
+        if fichiers_sel_s3:
+            st.success(f" {len(fichiers_sel_s3)} fichier(s) server 3 sélectionné(s)")
+        else:
+            st.warning(" Aucun fichier server 3 sélectionné")
+    else:
+        st.info("📭 Aucun fichier server 3 trouvé dans le repo")
+
+    uploaded_s3 = st.file_uploader(
+        "➕ Ajouter des fichiers server 3 manuellement",
+        type=["csv"],
+        accept_multiple_files=True,
+        key="s3_files_upload",
+    )
+    if uploaded_s3:
+        import tempfile
+        for uf in uploaded_s3:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+            tmp.write(uf.read())
+            tmp.close()
+            selected_s3_paths.append(tmp.name)
+
+    render_server3_section(selected_s3_paths)
 
     st.markdown("---")
     st.header(" Analyse IA — Gemini")
