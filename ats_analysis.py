@@ -11,6 +11,7 @@ import os
 from plotly.subplots import make_subplots
 from datetime import datetime
 from server2_analysis import render_server2_section, parse_server2_csv, normalize_server2
+from server3_analysis import render_server3_section
 
 def time_to_seconds(t_str: str) -> int:
     if not t_str or t_str in ["0:00:00", "00:00:00"]:
