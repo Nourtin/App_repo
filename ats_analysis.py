@@ -1461,10 +1461,12 @@ def render_ats_tab(api_key_input: str = None):
 
         server2 = glob.glob(os.path.join(data_dir, "server2_report_*.csv"))
         server2 = [f for f in server2 if "latest" not in f]
+        server3 = glob.glob(os.path.join(data_dir, "server3_report_*.csv"))
+        server3 = [f for f in server3 if "latest" not in f]
 
         return sorted(old), sorted(server1), sorted(server2)
 
-    old_files, server1_files, server2_files = load_auto_files()
+    old_files, server1_files, server2_files, server3_files = load_auto_files()
     all_server1 = old_files + server1_files
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1474,13 +1476,15 @@ def render_ats_tab(api_key_input: str = None):
         with open(update_path, "r") as f:
             last_update_str = f.read().strip()
 
-    col_info1, col_info2, col_info3 = st.columns(3)
+    col_info1, col_info2, col_info3, col_info4 = st.columns(4)  # 4 colonnes
     with col_info1:
         st.caption(f"📁 Ancien format : {len(old_files)} fichier(s)")
     with col_info2:
         st.caption(f"🖥️ Serveur 1 : {len(server1_files)} fichier(s)")
     with col_info3:
         st.caption(f"🖥️ Serveur 2 : {len(server2_files)} fichier(s)")
+    with col_info4:
+        st.caption(f"🖥️ Serveur 3 : {len(server3_files)} fichier(s)")
 
     st.markdown("---")
     st.subheader("🖥️ Serveur 1 — Fichiers ATS")
