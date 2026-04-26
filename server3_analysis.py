@@ -41,7 +41,7 @@ def parse_server3_csv(content: str, filename: str) -> pd.DataFrame:
         df = pd.read_csv(StringIO(content), sep=sep, encoding="utf-8", on_bad_lines="skip", dtype=str)
         df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
         df["_source_file"] = filename
-        df["_server"] = "Serveur 2"
+        df["_server"] = "Serveur 3"
         return df
     except Exception as e:
         st.warning(f"Erreur parsing {filename} : {e}")
@@ -105,10 +105,10 @@ def fmt_sec(sec: int) -> str:
 
 def render_server3_section(server3_files: list):
     st.markdown("---")
-    st.header("🖥️ Serveur 2 — Analyses vicidial_log")
+    st.header("🖥️ Serveur 3 — Analyses vicidial_log")
 
     if not server3_files:
-        st.info("📭 Aucun fichier Serveur 2 sélectionné.")
+        st.info("📭 Aucun fichier Serveur 3 sélectionné.")
         return
 
     dfs = []
@@ -124,7 +124,7 @@ def render_server3_section(server3_files: list):
             st.warning(f"Erreur {path} : {e}")
 
     if not dfs:
-        st.warning("⚠️ Aucune donnée exploitable dans les fichiers Serveur 2.")
+        st.warning("⚠️ Aucune donnée exploitable dans les fichiers Serveur 3.")
         _show_debug_tip()
         return
 
@@ -368,7 +368,7 @@ def render_server3_section(server3_files: list):
 def _show_debug_tip():
     with st.expander("🔍 Aide au diagnostic", expanded=True):
         st.markdown("""
-**Format attendu pour les fichiers Serveur 2 :**
+**Format attendu pour les fichiers Serveur 3 :**
 ```
 call_date,lead_id,list_id,campaign_id,user,phone_number,status,length_in_sec
 2026-04-21 08:38:54,4133728,180,Batbot,VDAD,985420564,AA,0
