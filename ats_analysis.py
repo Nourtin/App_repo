@@ -1464,7 +1464,7 @@ def render_ats_tab(api_key_input: str = None):
         server3 = glob.glob(os.path.join(data_dir, "server3_report_*.csv"))
         server3 = [f for f in server3 if "latest" not in f]
 
-        return sorted(old), sorted(server1), sorted(server2)
+        return sorted(old), sorted(server1), sorted(server2), sorted(server3)
 
     old_files, server1_files, server2_files, server3_files = load_auto_files()
     all_server1 = old_files + server1_files
