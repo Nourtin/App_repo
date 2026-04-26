@@ -1448,7 +1448,7 @@ def render_ats_tab(api_key_input: str = None):
     st.markdown("---")
 
     st.subheader("📤 Sélectionner les fichiers ATS")
-    #@st.cache_data(ttl=300)
+    @st.cache_data(ttl=300, show_spinner=False)
     def load_auto_files():
         base_dir = os.path.dirname(os.path.abspath(__file__))
         data_dir = os.path.join(base_dir, "data")
