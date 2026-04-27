@@ -19,7 +19,7 @@ from analyse import (
     taux_remplissage_code_postal, comparer_codes_postaux, analyse_fiabilite_par_fournisseur,
     codes_postaux_non_correspondants, analyse_par_type_logement,
     comparer_types_logement, classification_detaillee_par_type, appels_par_piso_casa,
-    analyse_par_type_logement
+    analyse_par_type_logement,duree_par_classification_prioritaire
 )
 from ats_analysis import render_ats_tab
 
@@ -223,6 +223,7 @@ with tab1:
         qualif_mask = df["Classification"].astype(str).str.upper().str.strip().isin([c.upper() for c in classifications_qualif])
         appels_qualifies = qualif_mask.sum()
         taux_qualifie = round(appels_qualifies / len(df) * 100, 1) if len(df) > 0 else 0
+        kpis.get("duree_moyenne_utiles_sec")
     else:
         appels_qualifies = None
         taux_qualifie = None
