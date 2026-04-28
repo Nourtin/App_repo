@@ -274,7 +274,7 @@ def appels_par_heure(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def repartition_classification(df: pd.DataFrame, max_categories: int = 12) -> pd.DataFrame:
+def repartition_classification(df: pd.DataFrame, max_categories: int = 10) -> pd.DataFrame:
     """
     Répartition par Classification — exclut les vides et 'non trouvé'.
     Limite le nombre de catégories affichées pour éviter le surchargement visuel.
@@ -291,8 +291,8 @@ def repartition_classification(df: pd.DataFrame, max_categories: int = 12) -> pd
 
     # Si trop de catégories, regrouper les moins fréquentes
     if len(counts) > max_categories:
-        top = counts.head(max_categories).copy()
-        autres = counts.tail(len(counts) - max_categories)
+        top = counts.head(max_categories - 1).copy()  # Garder une place pour AUTRES
+        autres = counts.tail(len(counts) - (max_categories - 1))
         autres_count = autres["count"].sum()
         top = pd.concat([
             top,
@@ -352,19 +352,6 @@ def appels_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     # Agrégation
-    agg_dict = {
-        "nb_appels": ("list_name", "count"),
-        "nb_utiles": ("_utile", "sum"),
-        "nb_qualifies": ("_qualifie", "sum"),
-        "duree_moy_sec": ("_duree", "mean"),
-    }
-
-    # Ajouter les durées moyennes par catégorie
-    for cat in CLASSIFICATIONS_PRIORITAIRES:
-        col_mask = f"_{cat.lower().replace(' ', '_')}"
-        # Durée moyenne conditionnelle : on filtre d'abord
-        pass  # On le fera après le groupby pour plus de clarté
-
     agg = df.groupby("list_name").agg(
         nb_appels=("list_name", "count"),
         nb_utiles=("_utile", "sum"),
@@ -485,23 +472,20 @@ def _nettoyer_code_postal(series: pd.Series) -> pd.Series:
 
 def _est_code_postal_valide(series: pd.Series) -> pd.Series:
     """Vérifie si un code postal est valide (non vide et contient des chiffres)."""
-    s = series.astype(str).str.strip()
-    s = s.replace({"nan": "", "None": "", "NONE": "", "<NA>": ""})
-    s = s.str.replace(r'\D', '', regex=True)
-    return (s != "") & (s.str.len() > 0)
+    s = _nettoyer_code_postal(series)
+    return (s != "") & (s.str.len() >= 4)  # Code postal valide au moins 4 chiffres
 
 
 def taux_remplissage_code_postal(df: pd.DataFrame) -> dict:
     """
-    Calcule le taux de remplissage de la colonne code_postal
-    et compare client vs fournisseur
+    Calcule le taux de remplissage des colonnes de code postal
     """
     resultats = {}
 
-    # Vérifier les colonnes disponibles (différentes orthographes possibles)
+    # Vérifier les colonnes disponibles
     colonnes_possibles = {
-        "code_postal": ["code_postal", "Code_postal", "CODE_POSTAL", "codigo_postal_client"],
-        "codigo_postal": ["codigo_postal", "Codigo_postal", "CODIGO_POSTAL", "codigo_postal_fournisseur"]
+        "code_postal_client": ["code_postal", "Code_postal", "CODE_POSTAL", "codigo_postal_client"],
+        "codigo_postal_fournisseur": ["codigo_postal", "Codigo_postal", "CODIGO_POSTAL", "codigo_postal_fournisseur"]
     }
 
     colonnes_trouvees = {}
@@ -531,7 +515,7 @@ def comparer_codes_postaux(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
     """
     Compare les codes postaux donnés par le client vs fournisseur.
     Retourne les lignes où les deux sont disponibles et le taux de correspondance.
-    CORRECTION : utilise les bonnes colonnes pour le nettoyage.
+    CORRECTION : logique de calcul revue.
     """
     # Détecter les colonnes
     col_client = None
@@ -549,15 +533,14 @@ def comparer_codes_postaux(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
 
     df_comp = df.copy()
 
-    # Nettoyer les codes postaux (garder seulement les chiffres) - CORRECTION ICI
-    df_comp["code_postal_clean"] = _nettoyer_code_postal(df_comp[col_client])
-    df_comp["codigo_postal_clean"] = _nettoyer_code_postal(df_comp[col_fournisseur])
+    # Nettoyer les codes postaux
+    df_comp["cp_client_clean"] = _nettoyer_code_postal(df_comp[col_client])
+    df_comp["cp_fourn_clean"] = _nettoyer_code_postal(df_comp[col_fournisseur])
 
-    # Filtrer les lignes où les deux sont disponibles
-    masque_disponibles = (
-        _est_code_postal_valide(df_comp[col_client]) & 
-        _est_code_postal_valide(df_comp[col_fournisseur])
-    )
+    # Filtrer les lignes où les deux sont valides
+    client_valide = _est_code_postal_valide(df_comp[col_client])
+    fourn_valide = _est_code_postal_valide(df_comp[col_fournisseur])
+    masque_disponibles = client_valide & fourn_valide
 
     df_disponibles = df_comp[masque_disponibles].copy()
 
@@ -567,11 +550,11 @@ def comparer_codes_postaux(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
             "nb_correspondances": 0,
             "nb_differences": 0,
             "taux_correspondance": 0.0,
-            "message": "Aucune ligne avec les deux codes postaux disponibles"
+            "message": "Aucune ligne avec les deux codes postaux valides"
         }
 
-    # Vérifier la correspondance
-    df_disponibles["correspond"] = df_disponibles["code_postal_clean"] == df_disponibles["codigo_postal_clean"]
+    # Vérifier la correspondance (comparer les 5 premiers chiffres)
+    df_disponibles["correspond"] = df_disponibles["cp_client_clean"].str[:5] == df_disponibles["cp_fourn_clean"].str[:5]
 
     # Calcul des statistiques
     stats = {
@@ -601,13 +584,13 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in df.columns:
         col_lower = col.lower()
-        if col_lower in ["code_postal", "codepostal", "cp_client"]:
+        if col_lower in ["code_postal", "codepostal", "cp_client", "codigo_postal_client"]:
             col_client = col
-        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur"]:
+        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur", "codigo_postal_fournisseur"]:
             col_fournisseur = col
 
     if col_client is None or col_fournisseur is None:
-        return pd.DataFrame({"error": [f"Colonnes CP manquantes: client={col_client}, fourn={col_fournisseur}"]})
+        return pd.DataFrame()
 
     resultats = []
 
@@ -622,24 +605,25 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
         df_fourn["cp_client_clean"] = _nettoyer_code_postal(df_fourn[col_client])
         df_fourn["cp_fourn_clean"] = _nettoyer_code_postal(df_fourn[col_fournisseur])
 
-        # Taux de remplissage
-        client_rempli = _est_code_postal_valide(df_fourn[col_client])
-        fournisseur_rempli = _est_code_postal_valide(df_fourn[col_fournisseur])
+        # Taux de remplissage (codes valides)
+        client_valide = _est_code_postal_valide(df_fourn[col_client])
+        fourn_valide = _est_code_postal_valide(df_fourn[col_fournisseur])
 
-        taux_client = round(client_rempli.sum() / total * 100, 1)
-        taux_fournisseur = round(fournisseur_rempli.sum() / total * 100, 1)
+        taux_client = round(client_valide.sum() / total * 100, 1)
+        taux_fournisseur = round(fourn_valide.sum() / total * 100, 1)
 
-        # Comparaisons : quand les deux sont remplis
-        les_deux_remplis = client_rempli & fournisseur_rempli
-        nb_comparaisons = int(les_deux_remplis.sum())
+        # Comparaisons : quand les deux sont valides
+        les_deux_valides = client_valide & fourn_valide
+        nb_comparaisons = int(les_deux_valides.sum())
 
         if nb_comparaisons > 0:
-            correspondance = (df_fourn.loc[les_deux_remplis, "cp_client_clean"] == 
-                            df_fourn.loc[les_deux_remplis, "cp_fourn_clean"]).sum()
+            correspondance = (df_fourn.loc[les_deux_valides, "cp_client_clean"].str[:5] == 
+                            df_fourn.loc[les_deux_valides, "cp_fourn_clean"].str[:5]).sum()
             taux_correspondance = round(correspondance / nb_comparaisons * 100, 1)
+            nb_correspondances = int(correspondance)
         else:
-            correspondance = 0
-            taux_correspondance = None  # Pas de comparaison possible, pas 0
+            nb_correspondances = 0
+            taux_correspondance = None  # Pas de comparaison possible
 
         resultats.append({
             "fournisseur": fournisseur,
@@ -647,8 +631,8 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
             "taux_remplissage_client_pct": taux_client,
             "taux_remplissage_fournisseur_pct": taux_fournisseur,
             "nb_comparaisons": nb_comparaisons,
-            "nb_correspondances": int(correspondance),
-            "taux_correspondance_pct": taux_correspondance,
+            "nb_correspondances": nb_correspondances,
+            "taux_correspondance_pct": taux_correspondance if taux_correspondance is not None else 0,
         })
 
     df_resultat = pd.DataFrame(resultats)
@@ -668,24 +652,22 @@ def codes_postaux_non_correspondants(df: pd.DataFrame) -> pd.DataFrame:
 
     for col in df.columns:
         col_lower = col.lower()
-        if col_lower in ["code_postal", "codepostal", "cp_client"]:
+        if col_lower in ["code_postal", "codepostal", "cp_client", "codigo_postal_client"]:
             col_client = col
-        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur"]:
+        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur", "codigo_postal_fournisseur"]:
             col_fournisseur = col
 
     if col_client is None or col_fournisseur is None:
         return pd.DataFrame()
 
     df_comp = df.copy()
-    df_comp["code_postal_clean"] = _nettoyer_code_postal(df_comp[col_client])
-    df_comp["codigo_postal_clean"] = _nettoyer_code_postal(df_comp[col_fournisseur])
+    df_comp["cp_client_clean"] = _nettoyer_code_postal(df_comp[col_client])
+    df_comp["cp_fourn_clean"] = _nettoyer_code_postal(df_comp[col_fournisseur])
 
-    # Filtrer où les deux sont disponibles et différents
-    masque = (
-        _est_code_postal_valide(df_comp[col_client]) & 
-        _est_code_postal_valide(df_comp[col_fournisseur]) &
-        (df_comp["code_postal_clean"] != df_comp["codigo_postal_clean"])
-    )
+    # Filtrer où les deux sont valides et différents
+    client_valide = _est_code_postal_valide(df_comp[col_client])
+    fourn_valide = _est_code_postal_valide(df_comp[col_fournisseur])
+    masque = client_valide & fourn_valide & (df_comp["cp_client_clean"].str[:5] != df_comp["cp_fourn_clean"].str[:5])
 
     return df_comp[masque].copy()
 
@@ -708,10 +690,10 @@ def logement_par_fournisseur(df: pd.DataFrame, regrouper: bool = True) -> pd.Dat
     if "list_name" not in df.columns:
         return pd.DataFrame()
 
-    # Détecter la colonne de logement (piso_casa ou tipo_vivienda)
+    # Détecter la colonne de logement
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -745,7 +727,7 @@ def logement_par_fournisseur(df: pd.DataFrame, regrouper: bool = True) -> pd.Dat
 
     # Ajouter les pourcentages
     cross_pct = cross.div(cross["total_appels"], axis=0) * 100
-    cross_pct = cross_pct.rename(columns={col: f"{col}_pct" for col in cross_pct.columns})
+    cross_pct = cross_pct.rename(columns={col: f"{col}_pct" for col in cross_pct.columns if col != "total_appels"})
 
     # Combiner
     resultat = cross.join(cross_pct)
@@ -776,7 +758,7 @@ def top_logement_par_fournisseur(df: pd.DataFrame, top_n: int = 3, regrouper: bo
     # Détecter la colonne de logement
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -832,7 +814,7 @@ def classification_par_type_logement(df: pd.DataFrame, regrouper: bool = True) -
     # Détecter la colonne de logement
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -881,7 +863,7 @@ def appels_par_piso_casa(df: pd.DataFrame, regrouper: bool = True) -> pd.DataFra
     # Détecter la colonne
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -969,7 +951,7 @@ def analyse_par_type_logement(df: pd.DataFrame, regrouper: bool = True) -> dict:
     # Détecter la colonne de logement
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -1068,7 +1050,7 @@ def comparer_types_logement(df: pd.DataFrame, regrouper: bool = True) -> pd.Data
     # Détecter la colonne
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -1140,7 +1122,7 @@ def classification_detaillee_par_type(df: pd.DataFrame, regrouper: bool = True) 
     # Détecter la colonne
     col_logement = None
     for col in df.columns:
-        if col.lower() in ["piso_casa", "tipo_vivienda", "tipo_vivienda", "type_logement"]:
+        if col.lower() in ["piso_casa", "tipo_vivienda", "type_logement"]:
             col_logement = col
             break
 
@@ -1250,9 +1232,9 @@ def audit_complet(df: pd.DataFrame) -> dict:
     col_cp_fourn = None
     for col in df.columns:
         col_lower = col.lower()
-        if col_lower in ["code_postal", "codepostal"]:
+        if col_lower in ["code_postal", "codepostal", "cp_client"]:
             col_cp_client = col
-        elif col_lower in ["codigo_postal", "codigopostal"]:
+        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur"]:
             col_cp_fourn = col
 
     if col_cp_client and col_cp_fourn:
