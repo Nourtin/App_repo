@@ -71,11 +71,11 @@ def _parse_ts(df: pd.DataFrame) -> pd.DataFrame:
 
 CLASSIFICATIONS_QUALIFIEES = [
     "PEU INTERESSE", "INTERESSE", "TRES INTERESSE", 
-    "EDIFICIOS", "RDV LEADS", "WHATSAP"
+    "EDIFICIOS", "RDV LEAD", "WHATSAP"
 ]
 
 CLASSIFICATIONS_PRIORITAIRES = [
-    "RDV LEADS", "TRES INTERESSE", "INTERESSE"
+    "RDV LEAD", "TRES INTERESSE", "INTERESSE"
 ]
 
 
@@ -218,7 +218,7 @@ def kpi_globaux(df: pd.DataFrame) -> dict:
     # Durée moyenne par catégorie prioritaire
     duree_tres_interesse = _duree_moyenne_par_classification(df, "TRES INTERESSE")
     duree_interesse = _duree_moyenne_par_classification(df, "INTERESSE")
-    duree_rdv_leads = _duree_moyenne_par_classification(df, "RDV LEADS")
+    duree_rdv_leads = _duree_moyenne_par_classification(df, "RDV LEAD")
 
     return {
         "total_appels": total,
@@ -329,7 +329,7 @@ def appels_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
       - nb total d'appels
       - nb appels utiles (classification valide != non trouvé/vide)
       - taux appels utiles (%)
-      - nb appels qualifies (PEU INTERESSE/INTERESSE/TRES INTERESSE/EDIFICIOS/RDV LEADS/WHATSAP)
+      - nb appels qualifies (PEU INTERESSE/INTERESSE/TRES INTERESSE/EDIFICIOS/RDV LEAD/WHATSAP)
       - taux appels qualifies (%)
       - durée moyenne (sec)
       - durée moyenne utiles (sec)
@@ -1060,7 +1060,7 @@ def comparer_types_logement(df: pd.DataFrame, regrouper: bool = True) -> pd.Data
         pct_inter = None
 
         if total > 0:
-            pct_rdv = round((df_type["Classification"].astype(str).str.strip().str.upper() == "RDV LEADS").sum() / total * 100, 1)
+            pct_rdv = round((df_type["Classification"].astype(str).str.strip().str.upper() == "RDV LEAD").sum() / total * 100, 1)
             pct_tres = round((df_type["Classification"].astype(str).str.strip().str.upper() == "TRES INTERESSE").sum() / total * 100, 1)
             pct_inter = round((df_type["Classification"].astype(str).str.strip().str.upper() == "INTERESSE").sum() / total * 100, 1)
 
