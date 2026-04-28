@@ -1314,3 +1314,113 @@ def duree_par_classification_prioritaire(df: pd.DataFrame) -> pd.DataFrame:
         })
 
     return pd.DataFrame(resultats)
+    # ─────────────────────────────────────────────
+# MAPPING TYPES DE LOGEMENT (regroupement intelligent)
+# ─────────────────────────────────────────────
+
+def _mapper_type_logement(series: pd.Series) -> Tuple[pd.Series, pd.Series]:
+    """
+    Regroupe automatiquement les types de logements similaires.
+    Retourne:
+        - series_groupee : la série avec les catégories regroupées
+        - series_detail : la série avec le détail original (pour drill-down)
+    """
+    detail = series.astype(str).str.strip()
+    
+    # Nettoyer les valeurs vides
+    detail = detail.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA, "NONE": pd.NA})
+    
+    groupee = detail.copy()
+    
+    # Patterns pour regroupement (insensible à la casse)
+    mappings = {
+        # PISO / APPARTEMENT (tous les types d'appartements)
+        "PISO/APARTAMENTO": [
+            r'^piso\b', r'^apartamento', r'^apartment', r'^ático', r'^atico',
+            r'^bajo\b', r'^entresuelo', r'^duplex', r'^dúplex', r'^triplex',
+            r'^estudio', r'^loft', r'^planta', r'^vivienda unifamiliar',
+            r'^dentro de un edificio', r'^bloque de viviendas', r'^barriada',
+            r'^piso/apartamento'
+        ],
+        
+        # CASA / MAISON (tous les types de maisons)
+        "CASA/CHALET": [
+            r'^casa\b', r'^chalet', r'^villa', r'^bungalow', r'^finca',
+            r'^masia', r'^torre', r'^adosado', r'^pareado', r'^unifamiliar',
+            r'^casa independiente', r'^casa de pueblo', r'^casa molinera',
+            r'^casa adosada', r'^casa particular', r'^chalet adosado',
+            r'^vivienda unifamiliar', r'^casa / chalet'
+        ],
+        
+        # EDIFICIO / LOCAL COMMERCIAL
+        "EDIFICIO/LOCAL": [
+            r'^edificio\b', r'^local\b', r'^nave', r'^oficina', r'^comercial',
+            r'^industrial', r'^bodega', r'^almacén', r'^almacen',
+            r'^despacho', r'^nave industrial'
+        ],
+        
+        # PARKING / GARAGE / TRASTERO
+        "PARKING/GARAGE": [
+            r'^parking', r'^garaje', r'^garage', r'^trastero', r'^plaza',
+            r'^cochera', r'^aparcamiento', r'^estacionamiento'
+        ],
+        
+        # TERRENO / SOLAR
+        "TERRENO/SOLAR": [
+            r'^terreno', r'^parcela', r'^solar', r'^finca rustica',
+            r'^finca rústica', r'^campo', r'^rustica', r'^rústica',
+            r'^agricola', r'^agrícola'
+        ],
+        
+        # PALACIO / CASA SEÑORIAL
+        "PALACIO/CASA SEÑORIAL": [
+            r'^palacio', r'^casa señorial', r'^casa senorial', r'^mansión', r'^mansion'
+        ]
+    }
+    
+    # Pour chaque valeur, trouver le groupe correspondant
+    for idx, val in groupee.items():
+        if pd.isna(val):
+            continue
+        val_lower = str(val).lower().strip()
+        trouve = False
+        
+        for groupe, patterns in mappings.items():
+            for pattern in patterns:
+                if re.search(pattern, val_lower):
+                    groupee.at[idx] = groupe
+                    trouve = True
+                    break
+            if trouve:
+                break
+        
+        if not trouve:
+            # Si pas de match, garder la valeur originale (capitalisée)
+            # Mais nettoyer un peu quand même
+            val_propre = val_lower.title()
+            if 'piso' in val_propre.lower() or 'apart' in val_propre.lower():
+                groupee.at[idx] = "PISO/APARTAMENTO"
+            elif 'casa' in val_propre.lower() or 'chalet' in val_propre.lower() or 'villa' in val_propre.lower():
+                groupee.at[idx] = "CASA/CHALET"
+            else:
+                groupee.at[idx] = val_propre
+    
+    return groupee, detail
+
+
+def get_detail_by_group(df: pd.DataFrame, group_name: str) -> pd.DataFrame:
+    """
+    Drill-down : retourne le détail des types pour un groupe donné
+    """
+    if "type_groupe" not in df.columns or "type_detail" not in df.columns:
+        return pd.DataFrame()
+    
+    df_group = df[df["type_groupe"] == group_name]
+    if df_group.empty:
+        return pd.DataFrame()
+    
+    details = df_group["type_detail"].value_counts().reset_index()
+    details.columns = ["Type original", "Nombre d'appels"]
+    details["%"] = (details["Nombre d'appels"] / details["Nombre d'appels"].sum() * 100).round(1)
+    
+    return details
