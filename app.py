@@ -287,6 +287,14 @@ tab1, tab2, tab3, tab4, tab5, tab_wc, tab_ats = st.tabs([
 
 with tab1:
     st.header("Analyse globale des appels")
+    # Debug - Afficher les classifications uniques
+    if "Classification" in df.columns:
+        uniq_class = df["Classification"].astype(str).str.upper().str.strip().unique()
+        st.sidebar.write("Classifications uniques:", sorted(uniq_class))
+        
+        # Compter les RDV LEADS
+        rdv_count = (df["Classification"].astype(str).str.upper().str.strip() == "RDV LEADS").sum()
+        st.sidebar.write(f"Nombre de RDV LEADS: {rdv_count}")
 
     kpis = kpi_globaux(df)
     _, taux_qualifie = _taux_qualification(df)
