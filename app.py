@@ -550,34 +550,57 @@ with tab3:
         else:
             st.info("Pas assez de données pour comparer les codes postaux")
 
-    st.markdown("---")
     st.subheader("🏢 Fiabilité par fournisseur")
     df_fiabilite = analyse_fiabilite_par_fournisseur(df)
-
+    
     if not df_fiabilite.empty:
-        st.dataframe(
-            df_fiabilite.rename(columns={
-                "fournisseur": "Fournisseur", "total_appels": "Total appels",
-                "taux_remplissage_client": "Taux remplissage client (%)",
-                "taux_remplissage_fournisseur": "Taux remplissage fournisseur (%)",
-                "nb_comparaisons": "Nb comparaisons", "taux_correspondance": "Taux correspondance (%)"
-            }),
-            use_container_width=True, hide_index=True,
-        )
-
+        # Renommer les colonnes pour l'affichage
+        col_rename = {}
+        for col in df_fiabilite.columns:
+            if 'fournisseur' in col.lower():
+                col_rename[col] = "Fournisseur"
+            elif 'total_appels' in col.lower():
+                col_rename[col] = "Total appels"
+            elif 'taux_remplissage_client' in col.lower():
+                col_rename[col] = "Taux remplissage client (%)"
+            elif 'taux_remplissage_fournisseur' in col.lower():
+                col_rename[col] = "Taux remplissage fournisseur (%)"
+            elif 'nb_comparaisons' in col.lower():
+                col_rename[col] = "Nb comparaisons"
+            elif 'taux_correspondance' in col.lower():
+                col_rename[col] = "Taux correspondance (%)"
+        
+        df_display = df_fiabilite.rename(columns=col_rename)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
+    
         col_g1, col_g2 = st.columns(2)
+        
         with col_g1:
-            df_plot = df_fiabilite.melt(id_vars=["fournisseur"],
-                                         value_vars=["taux_remplissage_client", "taux_remplissage_fournisseur"],
-                                         var_name="source", value_name="taux")
-            fig = px.bar(df_plot, x="fournisseur", y="taux", color="source", barmode="group")
-            st.plotly_chart(fig, use_container_width=True)
-
+            # Graphique des taux de remplissage
+            if 'Fournisseur' in df_display.columns:
+                # Préparer les données pour le graphique
+                df_plot = pd.DataFrame()
+                df_plot['Fournisseur'] = df_display['Fournisseur']
+                df_plot['Taux client'] = df_display.get('Taux remplissage client (%)', 0)
+                df_plot['Taux fournisseur'] = df_display.get('Taux remplissage fournisseur (%)', 0)
+                
+                df_melt = df_plot.melt(id_vars=['Fournisseur'], var_name='Source', value_name='Taux (%)')
+                fig = px.bar(df_melt, x='Fournisseur', y='Taux (%)', color='Source', barmode='group')
+                st.plotly_chart(fig, use_container_width=True)
+        
         with col_g2:
-            fig = px.bar(df_fiabilite, x="fournisseur", y="taux_correspondance",
-                         color="taux_correspondance", color_continuous_scale="RdYlGn")
-            fig.update_layout(coloraxis_showscale=False)
-            st.plotly_chart(fig, use_container_width=True)
+            # Graphique du taux de correspondance
+            if 'Fournisseur' in df_display.columns and 'Taux correspondance (%)' in df_display.columns:
+                fig = px.bar(
+                    df_display,
+                    x='Fournisseur',
+                    y='Taux correspondance (%)',
+                    color='Taux correspondance (%)',
+                    color_continuous_scale='RdYlGn',
+                    title="Taux de correspondance par fournisseur"
+                )
+                fig.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Données insuffisantes")
 
