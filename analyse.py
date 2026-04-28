@@ -7,6 +7,21 @@ from typing import Dict, List, Tuple, Optional
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
+def _sanitize_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """Nettoie un DataFrame pour l'affichage Streamlit (convertit les types non compatibles)"""
+    df_clean = df.copy()
+    for col in df_clean.columns:
+        # Convertir les listes, dicts et autres types non compatibles en string
+        if df_clean[col].apply(lambda x: isinstance(x, (list, dict, tuple))).any():
+            df_clean[col] = df_clean[col].astype(str)
+        # Convertir les NaN en string vide
+        elif df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].fillna('')
+    return df_clean
 
 def diagnostic_classification(df: pd.DataFrame):
     """Affiche les valeurs uniques de la colonne Classification pour diagnostic"""
