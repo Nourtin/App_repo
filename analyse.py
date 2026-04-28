@@ -1314,17 +1314,10 @@ def duree_par_classification_prioritaire(df: pd.DataFrame) -> pd.DataFrame:
         })
 
     return pd.DataFrame(resultats)
-    # ─────────────────────────────────────────────
-# MAPPING TYPES DE LOGEMENT (regroupement intelligent)
-# ─────────────────────────────────────────────
-
-# ─────────────────────────────────────────────
-# MAPPING TYPES DE LOGEMENT (regroupement intelligent)
-# ─────────────────────────────────────────────
 
 def _mapper_type_logement(series: pd.Series) -> Tuple[pd.Series, pd.Series]:
     """
-    Regroupe automatiquement les types de logements similaires.
+    Regroupe automatiquement les types de logements selon votre classification.
     Retourne:
         - series_groupee : la série avec les catégories regroupées
         - series_detail : la série avec le détail original (pour drill-down)
@@ -1336,13 +1329,46 @@ def _mapper_type_logement(series: pd.Series) -> Tuple[pd.Series, pd.Series]:
     
     groupee = detail.copy()
     
-    # Mapping pour vos types spécifiques
+    # VOTRE MAPPING
     mapping = {
-        "PISO": ["piso", "apartamento", "bajo", "bloque de viviendas", "barriada", "dentro de un edificio"],
-        "CASA": ["casa", "casa independiente", "casa de pueblo", "casa molinera", "casa adosada", "casa particular", "vivienda unifamiliar"],
-        "CHALET": ["chalet", "chalet adosado"],
-        "PALACIO": ["palacio"],
-        "EDIFICIO": ["edificio"]
+        # 🔹 Appartements
+        "Appartement": [
+            "piso", "piso en edificio", "piso edificio", "piso intermedio",
+            "piso dentro de un edificio", "piso/edificio", "departamento",
+            "estudio", "ático", "atico"
+        ],
+        
+        # 🔹 Maisons individuelles
+        "Maison individuelle": [
+            "casa", "casa independiente", "casa unifamiliar", "vivienda independiente",
+            "vivienda unifamiliar", "casa particular", "casa en baja", "casa a un piso"
+        ],
+        
+        # 🔹 Maisons spécifiques
+        "Maison spécifique": [
+            "chalet", "casa rural", "casa pasiva"
+        ],
+        
+        # 🔹 Immeubles
+        "Immeuble": [
+            "edificio", "edificio comunitario", "comunidad de vecinos",
+            "bloque", "bloque de pisos"
+        ],
+        
+        # 🔹 Logements atypiques
+        "Logement atypique": [
+            "cabaña", "caravana", "autocaravana", "finca", "cueva", "castillo"
+        ],
+        
+        # 🔹 Logements précaires
+        "Logement précaire": [
+            "chavola", "casilla"
+        ],
+        
+        # 🔹 Cas mixtes
+        "Mixte": [
+            "casa independiente, piso"
+        ]
     }
     
     # Appliquer le mapping
@@ -1351,15 +1377,15 @@ def _mapper_type_logement(series: pd.Series) -> Tuple[pd.Series, pd.Series]:
             continue
         
         trouve = False
-        for groupe, mots in mapping.items():
-            if val in mots:
+        for groupe, valeurs in mapping.items():
+            if val in valeurs:
                 groupee.at[idx] = groupe
                 trouve = True
                 break
         
         if not trouve:
-            # Garder la valeur originale si non trouvée
-            groupee.at[idx] = val.title()
+            # Si la valeur n'est dans aucun mapping, la mettre dans "Autre"
+            groupee.at[idx] = "Autre"
     
     return groupee, detail
 
@@ -1382,22 +1408,15 @@ def get_detail_by_group(df: pd.DataFrame, group_name: str) -> pd.DataFrame:
     return details
 
 
-def get_all_groups_summary(df: pd.DataFrame) -> pd.DataFrame:
+def get_all_groups(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Retourne un résumé de tous les groupes avec leurs sous-types
+    Retourne la liste de tous les groupes avec leurs effectifs
     """
-    if "type_groupe" not in df.columns or "type_detail" not in df.columns:
+    if "type_groupe" not in df.columns:
         return pd.DataFrame()
     
-    summary = []
-    for groupe in df["type_groupe"].dropna().unique():
-        df_g = df[df["type_groupe"] == groupe]
-        sous_types = df_g["type_detail"].value_counts().head(5).to_dict()
-        summary.append({
-            "Groupe": groupe,
-            "Total appels": len(df_g),
-            "Sous-types principaux": str(list(sous_types.keys()))[:50] + "...",
-            "Detail": sous_types
-        })
+    groups = df["type_groupe"].value_counts().reset_index()
+    groups.columns = ["Groupe", "Nombre d'appels"]
+    groups["%"] = (groups["Nombre d'appels"] / groups["Nombre d'appels"].sum() * 100).round(1)
     
-    return pd.DataFrame(summary)
+    return groups
