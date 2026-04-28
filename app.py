@@ -258,12 +258,13 @@ if df.empty:
 # ONGLETS
 # ─────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4, tab5, tab_ats = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab_wc, tab_ats = st.tabs([
     "📊 Analyse globale",
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
     "🏠 Logements",
     "🤖 AI Recommendations",
+    "☁️ Nuage de mots",
     "📋 Analyse des ATS par IA",
 ])
 
@@ -1266,3 +1267,215 @@ with tab5:
 
 with tab_ats:
     render_ats_tab(api_key_input=api_key_input)
+# ══════════════════════════════════════════════
+# TAB WORDCLOUD — nuage de mots resumen_conversacion
+# ══════════════════════════════════════════════
+ 
+with tab_wc:
+    import re
+    from collections import Counter
+ 
+    st.header("☁️ Nuage de mots — Résumés de conversation")
+ 
+    COLONNES_TEXTE_WC = ["resumen_conversacion", "resumen", "summary", "notes", "comentarios", "commentaires"]
+    col_texte_wc = next((c for c in COLONNES_TEXTE_WC if c in df.columns), None)
+ 
+    if col_texte_wc is None:
+        st.warning(
+            f"Aucune colonne texte trouvée. Colonnes recherchées : {', '.join(COLONNES_TEXTE_WC)}."
+        )
+    else:
+        st.caption(f"Colonne utilisée : **{col_texte_wc}**")
+ 
+        STOPWORDS_WC = {
+            "el","la","los","las","un","una","unos","unas","de","del","al","en","con",
+            "por","para","que","se","le","les","su","sus","mi","mis","tu","tus","es",
+            "son","ha","han","hay","no","si","pero","como","más","mas","muy","ya",
+            "también","o","y","e","a","me","te","nos","os","lo","fue","ser","estar",
+            "tiene","tienen","tener","puede","pueden","cuando","porque","todo","toda",
+            "todos","todas","este","esta","estos","estas","ese","esa","esos","esas",
+            "le","la","les","un","une","des","du","et","au","aux","ce","qui","ne",
+            "pas","plus","par","sur","dans","il","elle","ils","elles","je","nous",
+            "vous","on","sa","son","ses","mon","ton","être","avoir","avec","mais",
+            "the","a","an","and","or","but","in","on","at","to","for","of","with",
+            "it","is","was","are","be","been","has","have","had","this","that",
+            "they","he","she","we","you","i","not","cliente","client","llamada",
+            "appel","call","dice","dijo","dit","said","oui","yes","gracias","merci",
+            "thank","buenas","bonjour","hello","nan","none","null","",
+        }
+ 
+        with st.expander("⚙️ Paramètres", expanded=True):
+            col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+            with col_p1:
+                max_words_wc = st.slider("Mots max", 20, 300, 100, 10)
+            with col_p2:
+                min_freq_wc = st.slider("Fréquence min", 1, 20, 2)
+            with col_p3:
+                palette_wc = st.selectbox("Palette", ["Blues","Reds","Greens","Purples","Oranges","Viridis","Plasma"])
+            with col_p4:
+                mots_exclus_input = st.text_input("Exclure mots (virgule)", placeholder="ex: cliente, no")
+ 
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                classif_wc = "Toutes"
+                if "Classification" in df.columns:
+                    opts_cl = ["Toutes"] + sorted(df["Classification"].dropna().unique().tolist())
+                    classif_wc = st.selectbox("Filtrer classification", opts_cl)
+            with col_f2:
+                fourn_wc = "Tous"
+                if "list_name" in df.columns:
+                    opts_fo = ["Tous"] + sorted(df["list_name"].dropna().unique().tolist())
+                    fourn_wc = st.selectbox("Filtrer fournisseur", opts_fo, key="wc_fourn_sel")
+ 
+        # Appliquer filtres
+        df_wc = df.copy()
+        if classif_wc != "Toutes" and "Classification" in df_wc.columns:
+            df_wc = df_wc[df_wc["Classification"] == classif_wc]
+        if fourn_wc != "Tous" and "list_name" in df_wc.columns:
+            df_wc = df_wc[df_wc["list_name"] == fourn_wc]
+ 
+        mots_exclus_user = {m.strip().lower() for m in mots_exclus_input.split(",") if m.strip()}
+        stopwords_finaux = STOPWORDS_WC | mots_exclus_user
+ 
+        textes_wc = df_wc[col_texte_wc].dropna().astype(str)
+        textes_wc = textes_wc[(textes_wc.str.strip() != "") & (textes_wc.str.lower() != "nan")]
+ 
+        st.markdown(f"**{len(textes_wc):,} résumés** analysés.")
+ 
+        if textes_wc.empty:
+            st.warning("Aucun texte disponible avec ces filtres.")
+        else:
+            corpus_wc = " ".join(textes_wc.tolist()).lower()
+            corpus_wc = re.sub(r"[^a-záéíóúüñàâçèêëîïôùûæœ\s]", " ", corpus_wc)
+            mots_all = [m for m in corpus_wc.split() if m not in stopwords_finaux and len(m) > 2]
+            compteur_wc = Counter(mots_all)
+            top_mots_wc = [(m, f) for m, f in compteur_wc.most_common(max_words_wc) if f >= min_freq_wc]
+ 
+            if not top_mots_wc:
+                st.warning("Aucun mot ne correspond aux critères. Réduisez la fréquence minimale.")
+            else:
+                df_mots = pd.DataFrame(top_mots_wc, columns=["Mot", "Fréquence"])
+                freq_max = df_mots["Fréquence"].max()
+                freq_min = df_mots["Fréquence"].min()
+                freq_range = max(freq_max - freq_min, 1)
+ 
+                try:
+                    scale_wc = getattr(px.colors.sequential, palette_wc)
+                except AttributeError:
+                    scale_wc = px.colors.sequential.Blues
+ 
+                def _color(freq):
+                    ratio = (freq - freq_min) / freq_range
+                    return scale_wc[min(int(ratio * (len(scale_wc) - 1)), len(scale_wc) - 1)]
+ 
+                def _size(freq):
+                    return int(14 + (freq - freq_min) / freq_range * 66)
+ 
+                import math, hashlib
+                n_wc = len(df_mots)
+                cols_g = max(3, math.ceil(math.sqrt(n_wc * 1.8)))
+                rows_g = math.ceil(n_wc / cols_g)
+                cx_g, cy_g = cols_g // 2, rows_g // 2
+                coords_g = sorted(
+                    [(r, c) for r in range(rows_g) for c in range(cols_g)],
+                    key=lambda rc: (rc[0] - cy_g) ** 2 + (rc[1] - cx_g) ** 2,
+                )[:n_wc]
+ 
+                positions_wc = []
+                for idx_pos, (r, c) in enumerate(coords_g):
+                    mot_bytes = df_mots.iloc[idx_pos]["Mot"].encode()
+                    h = int(hashlib.md5(mot_bytes).hexdigest()[:4], 16)
+                    jx = (h % 30 - 15) / 100
+                    jy = ((h >> 4) % 30 - 15) / 100
+                    positions_wc.append((c / cols_g + jx, 1 - r / rows_g + jy))
+ 
+                col_cloud, col_stats = st.columns([3, 1])
+ 
+                with col_cloud:
+                    st.subheader("☁️ Nuage interactif")
+                    fig_wc = go.Figure()
+                    for i, row in df_mots.iterrows():
+                        if i >= len(positions_wc):
+                            break
+                        x_wc, y_wc = positions_wc[i]
+                        fig_wc.add_trace(go.Scatter(
+                            x=[x_wc], y=[y_wc],
+                            mode="text",
+                            text=[row["Mot"]],
+                            textfont=dict(size=_size(row["Fréquence"]), color=_color(row["Fréquence"]), family="Arial Black"),
+                            hovertemplate=f"<b>{row['Mot']}</b><br>Fréquence : {row['Fréquence']}<extra></extra>",
+                            showlegend=False,
+                        ))
+                    fig_wc.update_layout(
+                        height=540,
+                        margin=dict(l=0, r=0, t=10, b=0),
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-0.1, 1.2]),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[0.25, 1.25]),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(fig_wc, use_container_width=True)
+ 
+                with col_stats:
+                    st.subheader("📊 Top 20")
+                    st.dataframe(_sanitize_for_display(df_mots.head(20)), use_container_width=True, hide_index=True, height=500)
+ 
+                # Barres top 30
+                st.markdown("---")
+                st.subheader("📈 Top 30 mots — fréquences")
+                fig_bar_wc = px.bar(
+                    df_mots.head(30), x="Mot", y="Fréquence",
+                    text="Fréquence", color="Fréquence",
+                    color_continuous_scale=palette_wc,
+                )
+                fig_bar_wc.update_traces(textposition="outside")
+                fig_bar_wc.update_layout(xaxis_tickangle=-40, coloraxis_showscale=False, margin=dict(t=10))
+                st.plotly_chart(fig_bar_wc, use_container_width=True)
+ 
+                # Par classification
+                if "Classification" in df_wc.columns and classif_wc == "Toutes":
+                    st.markdown("---")
+                    st.subheader("🎯 Mots dominants par classification")
+                    classifs_v = sorted(
+                        c for c in df_wc["Classification"].dropna().astype(str).str.strip().unique()
+                        if c.lower() not in ("nan", "")
+                    )
+                    if classifs_v:
+                        tabs_cl = st.tabs([f"🏷️ {c}" for c in classifs_v])
+                        for tab_cl, cl in zip(tabs_cl, classifs_v):
+                            with tab_cl:
+                                mask_cl = (
+                                    df_wc["Classification"].astype(str).str.strip() == cl
+                                ) & df_wc[col_texte_wc].notna()
+                                tx_cl = df_wc.loc[mask_cl, col_texte_wc].astype(str)
+                                tx_cl = tx_cl[tx_cl.str.strip() != ""]
+                                if tx_cl.empty:
+                                    st.info("Aucun texte pour cette classification.")
+                                    continue
+                                corp_cl = re.sub(r"[^a-záéíóúüñàâçèêëîïôùûæœ\s]", " ", " ".join(tx_cl.tolist()).lower())
+                                mots_cl = [m for m in corp_cl.split() if m not in stopwords_finaux and len(m) > 2]
+                                top_cl = Counter(mots_cl).most_common(15)
+                                if top_cl:
+                                    df_cl = pd.DataFrame(top_cl, columns=["Mot", "Fréquence"])
+                                    col_ca, col_cb = st.columns([2, 1])
+                                    with col_ca:
+                                        fig_cl = px.bar(
+                                            df_cl, x="Fréquence", y="Mot", orientation="h",
+                                            text="Fréquence", color="Fréquence",
+                                            color_continuous_scale=palette_wc,
+                                            title=f"Top 15 — {cl} ({len(tx_cl):,} appels)",
+                                        )
+                                        fig_cl.update_traces(textposition="outside")
+                                        fig_cl.update_layout(coloraxis_showscale=False)
+                                        st.plotly_chart(fig_cl, use_container_width=True)
+                                    with col_cb:
+                                        st.dataframe(_sanitize_for_display(df_cl), use_container_width=True, hide_index=True)
+ 
+                # Export CSV
+                st.markdown("---")
+                st.download_button(
+                    "📥 Exporter la liste des mots (CSV)",
+                    data=df_mots.to_csv(index=False).encode("utf-8"),
+                    file_name="wordcloud_frequences.csv",
+                    mime="text/csv",
+                )
