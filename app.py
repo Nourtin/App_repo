@@ -579,7 +579,7 @@ with tab2:
             else:
                 # Récupérer la liste des fournisseurs sans erreur de type
                 if "list_name" in df.columns:
-                    fournisseurs_list = = get_fournisseurs_list(df)
+                    fournisseurs_list  = get_fournisseurs_list(df)
                 else:
                     fournisseurs_list = []
                 
