@@ -598,123 +598,189 @@ with tab3:
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
+# ══════════════════════════════════════════════
+# TAB 4 — LOGEMENTS (avec regroupement)
+# ══════════════════════════════════════════════
 with tab4:
     st.header("🏠 Analyse des logements")
 
-    if "piso_casa" not in df.columns:
-        st.warning("Colonne 'piso_casa' non trouvée dans les données")
+    if "piso_casa" not in df.columns and "tipo_vivienda" not in df.columns:
+        st.warning("Colonne 'piso_casa' ou 'tipo_vivienda' non trouvée")
     else:
-        st.subheader("📊 Vue d'ensemble par type de logement")
-        analyse_types = analyse_par_type_logement(df)
-
-        if "error" not in analyse_types:
-            df_comparaison = comparer_types_logement(df)
-
-            if not df_comparaison.empty:
-                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                col_m1.metric("Types de logement", len(df_comparaison))
-                col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
-                meilleur_type = df_comparaison.loc[df_comparaison["taux_qualifies"].idxmax(), "type_logement"]
-                meilleur_taux = df_comparaison["taux_qualifies"].max()
-                col_m3.metric("🏆 Meilleur taux", f"{meilleur_taux}%", meilleur_type)
-                pire_type = df_comparaison.loc[df_comparaison["taux_qualifies"].idxmin(), "type_logement"]
-                pire_taux = df_comparaison["taux_qualifies"].min()
-                col_m4.metric("Plus faible", f"{pire_taux}%", pire_type)
-
-                st.markdown("---")
-                col_g1, col_g2 = st.columns(2)
-
-                with col_g1:
-                    fig = px.bar(df_comparaison.sort_values("taux_qualifies"), x="taux_qualifies", y="type_logement",
-                                 orientation="h", text="taux_qualifies", color="taux_qualifies",
-                                 color_continuous_scale="RdYlGn")
-                    fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                    fig.update_layout(coloraxis_showscale=False)
-                    st.plotly_chart(fig, use_container_width=True)
-
-                with col_g2:
-                    fig = px.bar(df_comparaison.sort_values("total_appels"), x="total_appels", y="type_logement",
-                                 orientation="h", text="total_appels", color="total_appels",
-                                 color_continuous_scale="Blues")
-                    fig.update_traces(textposition="outside")
-                    fig.update_layout(coloraxis_showscale=False)
-                    st.plotly_chart(fig, use_container_width=True)
-
-                st.markdown("---")
-                st.dataframe(
-                    df_comparaison.rename(columns={
-                        "type_logement": "Type de logement", "total_appels": "Total appels",
-                        "appels_valides": "Appels valides", "taux_valides": "Taux valides (%)",
-                        "appels_qualifies": "Appels qualifiés", "taux_qualifies": "Taux qualification (%)"
-                    }),
-                    use_container_width=True, hide_index=True
-                )
-
+        # Déterminer la colonne à utiliser
+        col_logement = "tipo_vivienda" if "tipo_vivienda" in df.columns else "piso_casa"
+        
+        # Appliquer le regroupement
+        df_log = df.copy()
+        df_log["type_groupe"], df_log["type_detail"] = _mapper_type_logement(df_log[col_logement])
+        
+        st.subheader("📊 Vue d'ensemble par type de logement (regroupée)")
+        
+        # Option pour afficher regroupé ou détail
+        view_mode = st.radio(
+            "Mode d'affichage",
+            options=["🏠 Vue regroupée", "📋 Vue détaillée (tous les types)"],
+            horizontal=True
+        )
+        
+        if view_mode == "🏠 Vue regroupée":
+            # Analyse avec regroupement
+            analyse_types = analyse_par_type_logement(df, regrouper=True)
+            df_comparaison = comparer_types_logement(df, regrouper=True)
+        else:
+            # Vue détaillée sans regroupement
+            analyse_types = analyse_par_type_logement(df, regrouper=False)
+            df_comparaison = comparer_types_logement(df, regrouper=False)
+        
+        if "error" not in analyse_types and not df_comparaison.empty:
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            col_m1.metric("Types de logement", len(df_comparaison))
+            col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
+            meilleur_type = df_comparaison.loc[df_comparaison["taux_qualifies"].idxmax(), "type_logement"]
+            meilleur_taux = df_comparaison["taux_qualifies"].max()
+            col_m3.metric("🏆 Meilleur taux", f"{meilleur_taux}%", meilleur_type)
+            pire_type = df_comparaison.loc[df_comparaison["taux_qualifies"].idxmin(), "type_logement"]
+            pire_taux = df_comparaison["taux_qualifies"].min()
+            col_m4.metric("Plus faible", f"{pire_taux}%", pire_type)
+            
+            st.markdown("---")
+            col_g1, col_g2 = st.columns(2)
+            
+            with col_g1:
+                fig = px.bar(df_comparaison.sort_values("taux_qualifies"), x="taux_qualifies", y="type_logement",
+                             orientation="h", text="taux_qualifies", color="taux_qualifies",
+                             color_continuous_scale="RdYlGn")
+                fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                fig.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col_g2:
+                fig = px.bar(df_comparaison.sort_values("total_appels"), x="total_appels", y="type_logement",
+                             orientation="h", text="total_appels", color="total_appels",
+                             color_continuous_scale="Blues")
+                fig.update_traces(textposition="outside")
+                fig.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            st.markdown("---")
+            st.dataframe(
+                df_comparaison.rename(columns={
+                    "type_logement": "Type de logement", "total_appels": "Total appels",
+                    "appels_valides": "Appels valides", "taux_valides": "Taux valides (%)",
+                    "appels_qualifies": "Appels qualifiés", "taux_qualifies": "Taux qualification (%)",
+                    "pct_rdv_leads": "RDV Leads (%)", "pct_tres_interesse": "Très intéressé (%)",
+                    "pct_interesse": "Intéressé (%)"
+                }),
+                use_container_width=True, hide_index=True
+            )
+        
         st.markdown("---")
-        st.subheader("🔍 Analyse détaillée par type de logement")
-
-        try:
-            types_series = df["piso_casa"].dropna().astype(str).str.strip()
-            types_series = types_series[~types_series.isin(["", "nan", "None", "none", "NaN", "null", "N/A", "n/a"])]
-            types_list = sorted(types_series.unique())
-        except Exception as e:
-            st.error(f"Erreur : {e}")
-            types_list = []
-
+        st.subheader("🔍 Drill-down par type de logement")
+        
+        # Liste des groupes disponibles (si mode regroupé)
+        if view_mode == "🏠 Vue regroupée":
+            types_list = sorted(df_log["type_groupe"].dropna().unique())
+            types_list = [t for t in types_list if t not in ["", "nan", "None"]]
+        else:
+            types_list = sorted(df_log["type_detail"].dropna().unique())
+            types_list = [t for t in types_list if t not in ["", "nan", "None"]]
+        
         if types_list:
             selected_type = st.selectbox("Choisissez un type de logement", types_list)
-
-            if selected_type and "error" not in analyse_types and selected_type in analyse_types:
-                data = analyse_types[selected_type]
-                col_d1, col_d2, col_d3, col_d4 = st.columns(4)
-                col_d1.metric("Total appels", data["total_appels"])
-                col_d2.metric("Appels utiles", data["appels_utiles"])
-                col_d3.metric("Taux utiles", f"{data['taux_utiles_pct']}%")
-                col_d4.metric("Taux qualification", f"{data['taux_qualifies_pct']}%")
-
-                if data["duree_moyenne_sec"]:
-                    st.metric("Durée moyenne", f"{data['duree_moyenne_sec']}s")
-
-                col_r1, col_r2 = st.columns(2)
-                with col_r1:
-                    if data["repartition_classifications"]:
-                        df_repart = pd.DataFrame([{"Classification": k, "Nombre": v}
-                                                   for k, v in data["repartition_classifications"].items()])
-                        fig = px.pie(df_repart, names="Classification", values="Nombre",
-                                     color_discrete_sequence=PALETTE, hole=0.3)
-                        fig.update_traces(textinfo="percent+label")
-                        st.plotly_chart(fig, use_container_width=True)
-
-                with col_r2:
-                    st.subheader("🏆 Top 3 classifications")
-                    if data["top_classifications"]:
-                        for i, (classification, count) in enumerate(data["top_classifications"].items(), 1):
-                            pct = round(count / data['total_appels'] * 100, 1)
-                            st.markdown(f"**{i}. {classification}** → {count} appels ({pct}%)")
+            
+            if view_mode == "🏠 Vue regroupée" and selected_type:
+                # Afficher le détail du groupe (drill-down)
+                st.markdown(f"**📋 Détail des sous-types pour '{selected_type}':**")
+                details = get_detail_by_group(df_log, selected_type)
+                if not details.empty:
+                    st.dataframe(details, use_container_width=True, hide_index=True)
+                    
+                    # Graphique des sous-types
+                    fig = px.bar(details, x="Type original", y="Nombre d'appels",
+                                 text="%", color="Nombre d'appels",
+                                 color_continuous_scale="Viridis")
+                    fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Analyse détaillée pour ce groupe
+                if selected_type in analyse_types:
+                    data = analyse_types[selected_type]
+                    
+                    st.markdown("---")
+                    col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+                    col_d1.metric("Total appels", data["total_appels"])
+                    col_d2.metric("Appels utiles", data["appels_utiles"])
+                    col_d3.metric("Taux utiles", f"{data['taux_utiles_pct']}%")
+                    col_d4.metric("Taux qualification", f"{data['taux_qualifies_pct']}%")
+                    
+                    # Afficher les pourcentages prioritaires
+                    if "pct_prioritaires" in data:
+                        st.markdown("**📊 Classifications prioritaires:**")
+                        cols = st.columns(3)
+                        for i, (cat, values) in enumerate(data["pct_prioritaires"].items()):
+                            with cols[i]:
+                                st.metric(
+                                    cat,
+                                    f"{values['pct_du_total']}%",
+                                    f"{values['count']} appels"
+                                )
+                    
+                    if data["duree_moyenne_sec"]:
+                        st.metric("Durée moyenne", f"{data['duree_moyenne_sec']}s")
+                    
+                    col_r1, col_r2 = st.columns(2)
+                    with col_r1:
+                        if data["repartition_classifications"]:
+                            df_repart = pd.DataFrame([{"Classification": k, "Nombre": v}
+                                                       for k, v in data["repartition_classifications"].items()])
+                            fig = px.pie(df_repart, names="Classification", values="Nombre",
+                                         color_discrete_sequence=PALETTE, hole=0.3)
+                            fig.update_traces(textinfo="percent+label")
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col_r2:
+                        st.subheader("🏆 Top 3 classifications")
+                        if data["top_classifications"]:
+                            for i, (classification, count) in enumerate(data["top_classifications"].items(), 1):
+                                pct = round(count / data['total_appels'] * 100, 1)
+                                st.markdown(f"**{i}. {classification}** → {count} appels ({pct}%)")
+            else:
+                # Vue détaillée - affichage direct
+                if selected_type in analyse_types:
+                    data = analyse_types[selected_type]
+                    col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+                    col_d1.metric("Total appels", data["total_appels"])
+                    col_d2.metric("Appels utiles", data["appels_utiles"])
+                    col_d3.metric("Taux utiles", f"{data['taux_utiles_pct']}%")
+                    col_d4.metric("Taux qualification", f"{data['taux_qualifies_pct']}%")
+                    
+                    if data["duree_moyenne_sec"]:
+                        st.metric("Durée moyenne", f"{data['duree_moyenne_sec']}s")
+                    
+                    col_r1, col_r2 = st.columns(2)
+                    with col_r1:
+                        if data["repartition_classifications"]:
+                            df_repart = pd.DataFrame([{"Classification": k, "Nombre": v}
+                                                       for k, v in data["repartition_classifications"].items()])
+                            fig = px.pie(df_repart, names="Classification", values="Nombre",
+                                         color_discrete_sequence=PALETTE, hole=0.3)
+                            fig.update_traces(textinfo="percent+label")
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    with col_r2:
+                        st.subheader("🏆 Top 3 classifications")
+                        if data["top_classifications"]:
+                            for i, (classification, count) in enumerate(data["top_classifications"].items(), 1):
+                                pct = round(count / data['total_appels'] * 100, 1)
+                                st.markdown(f"**{i}. {classification}** → {count} appels ({pct}%)")
         else:
             st.warning("Aucun type de logement valide trouvé")
-
-        st.markdown("---")
-        st.subheader("📋 Classification détaillée par type de logement")
-        df_classif_detail = classification_detaillee_par_type(df)
-
-        if not df_classif_detail.empty:
-            fig = px.bar(df_classif_detail, x="piso_casa", y="count", color="Classification",
-                         barmode="group", color_discrete_sequence=PALETTE)
-            fig.update_layout(xaxis_tickangle=-45, height=500)
-            st.plotly_chart(fig, use_container_width=True)
-
-            with st.expander("📑 Tableau détaillé"):
-                pivot_table = df_classif_detail.pivot_table(index="piso_casa", columns="Classification",
-                                                             values="count", fill_value=0)
-                st.dataframe(pivot_table, use_container_width=True)
-                csv = pivot_table.to_csv().encode('utf-8')
-                st.download_button("📥 Exporter", data=csv, file_name="classification_par_type_logement.csv", mime="text/csv")
-
+        
         st.markdown("---")
         st.subheader("📊 Vue simplifiée")
         df_tipo = appels_par_piso_casa(df)
-
+        
         if not df_tipo.empty:
             col_p, col_b = st.columns(2)
             with col_p:
@@ -723,14 +789,14 @@ with tab4:
                 fig.update_traces(textinfo="percent+label")
                 fig.update_layout(showlegend=False, margin=dict(t=10, b=10))
                 st.plotly_chart(fig, use_container_width=True)
-
+            
             with col_b:
                 fig = px.bar(df_tipo.sort_values("count"), x="count", y="piso_casa",
                              orientation="h", text="pct", color="count", color_continuous_scale="Purples")
                 fig.update_traces(texttemplate="%{text}%", textposition="outside")
                 fig.update_layout(yaxis_title="", xaxis_title="Appels", coloraxis_showscale=False, margin=dict(t=10))
                 st.plotly_chart(fig, use_container_width=True)
-
+            
             st.dataframe(df_tipo.rename(columns={"piso_casa": "Type de logement", "count": "Appels", "pct": "%"}),
                          use_container_width=True, hide_index=True)
 
