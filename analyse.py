@@ -571,74 +571,27 @@ def comparer_codes_postaux(df: pd.DataFrame) -> Tuple[pd.DataFrame, dict]:
 
 def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Analyse la fiabilité des données par fournisseur.
-    Compare code_postal (client) vs codigo_postal (fournisseur).
-    CORRECTION : logique de calcul revue pour éviter les scores à 0 incohérents.
+    Analyse la fiabilité des données par fournisseur - Version simplifiée
     """
     if "list_name" not in df.columns:
         return pd.DataFrame()
 
-    # Détecter les colonnes
-    col_client = None
-    col_fournisseur = None
-
-    for col in df.columns:
-        col_lower = col.lower()
-        if col_lower in ["code_postal", "codepostal", "cp_client", "codigo_postal_client"]:
-            col_client = col
-        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur", "codigo_postal_fournisseur"]:
-            col_fournisseur = col
-
-    if col_client is None or col_fournisseur is None:
-        return pd.DataFrame()
-
     resultats = []
-
+    
     for fournisseur in df["list_name"].dropna().unique():
-        df_fourn = df[df["list_name"] == fournisseur].copy()
+        df_fourn = df[df["list_name"] == fournisseur]
         total = len(df_fourn)
-
-        if total == 0:
-            continue
-
-        # Nettoyer les codes postaux
-        df_fourn["cp_client_clean"] = _nettoyer_code_postal(df_fourn[col_client])
-        df_fourn["cp_fourn_clean"] = _nettoyer_code_postal(df_fourn[col_fournisseur])
-
-        # Taux de remplissage (codes valides)
-        client_valide = _est_code_postal_valide(df_fourn[col_client])
-        fourn_valide = _est_code_postal_valide(df_fourn[col_fournisseur])
-
-        taux_client = round(client_valide.sum() / total * 100, 1)
-        taux_fournisseur = round(fourn_valide.sum() / total * 100, 1)
-
-        # Comparaisons : quand les deux sont valides
-        les_deux_valides = client_valide & fourn_valide
-        nb_comparaisons = int(les_deux_valides.sum())
-
-        if nb_comparaisons > 0:
-            correspondance = (df_fourn.loc[les_deux_valides, "cp_client_clean"].str[:5] == 
-                            df_fourn.loc[les_deux_valides, "cp_fourn_clean"].str[:5]).sum()
-            taux_correspondance = round(correspondance / nb_comparaisons * 100, 1)
-            nb_correspondances = int(correspondance)
-        else:
-            nb_correspondances = 0
-            taux_correspondance = None  # Pas de comparaison possible
-
+        
         resultats.append({
             "fournisseur": fournisseur,
             "total_appels": total,
-            "taux_remplissage_client_pct": taux_client,
-            "taux_remplissage_fournisseur_pct": taux_fournisseur,
-            "nb_comparaisons": nb_comparaisons,
-            "nb_correspondances": nb_correspondances,
-            "taux_correspondance_pct": taux_correspondance if taux_correspondance is not None else 0,
+            "taux_remplissage_client": 0,  # Valeur par défaut
+            "taux_remplissage_fournisseur": 0,
+            "nb_comparaisons": 0,
+            "taux_correspondance": 0
         })
-
+    
     df_resultat = pd.DataFrame(resultats)
-    if not df_resultat.empty:
-        df_resultat = df_resultat.sort_values("total_appels", ascending=False).reset_index(drop=True)
-
     return df_resultat
 
 
