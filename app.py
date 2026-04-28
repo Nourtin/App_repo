@@ -126,26 +126,37 @@ with st.sidebar:
         4. Copiez le lien et collez-le ci-dessous
         """)
     # URLs prédéfinies
-    st.markdown("**📌 URLs prédéfinies :**")
+    st.markdown("**📌 Choisissez une source :**")
+
+# URLs prédéfinies (remplacez par vos vraies URLs)
+    urls_preset = {
+        "🔵 Source 1": "https://docs.google.com/spreadsheets/d/1cgWINKu7diFGkAOWs9ZZq09CvanDeYKA3dLjOSzTng4/edit?usp=sharing",
+        "🟢 Source 2": "https://docs.google.com/spreadsheets/d/URL2",
+        "🟠 Source 3": "https://docs.google.com/spreadsheets/d/URL3",
+    }
     
-    col_url1, col_url2 = st.columns(2)
+    # Afficher les 3 boutons
+    col1, col2, col3 = st.columns(3)
     
-    with col_url1:
-        if st.button("📊 URL 1", use_container_width=True, key="url1_btn"):
-            sheet_url = "https://docs.google.com/spreadsheets/d/1cgWINKu7diFGkAOWs9ZZq09CvanDeYKA3dLjOSzTng4/edit?usp=sharing"
-            st.session_state.sheet_url = sheet_url
+    with col1:
+        if st.button("🔵 Source 1", use_container_width=True, key="preset_1"):
+            st.session_state.sheet_url = urls_preset["🔵 Source 1"]
             st.rerun()
     
-    with col_url2:
-        if st.button("📊 URL 2", use_container_width=True, key="url2_btn"):
-            sheet_url = "https://docs.google.com/spreadsheets/d/DEUXIEME_URL"
-            st.session_state.sheet_url = sheet_url
+    with col2:
+        if st.button("🟢 Source 2", use_container_width=True, key="preset_2"):
+            st.session_state.sheet_url = urls_preset["🟢 Source 2"]
             st.rerun()
     
-    # URLs personnalisées
+    with col3:
+        if st.button("🟠 Source 3", use_container_width=True, key="preset_3"):
+            st.session_state.sheet_url = urls_preset["🟠 Source 3"]
+            st.rerun()
+    
+    st.markdown("---")
     st.markdown("**✏️ Ou entrez votre propre URL :**")
     
-    # Utiliser session state pour garder l'URL
+    # Initialiser sheet_url dans session state
     if "sheet_url" not in st.session_state:
         st.session_state.sheet_url = ""
     
@@ -153,12 +164,7 @@ with st.sidebar:
         "URL du Google Sheet",
         value=st.session_state.sheet_url,
         placeholder="https://docs.google.com/spreadsheets/d/...",
-        key="sheet_url_input"
-    )
-
-    sheet_url = st.text_input(
-        "URL du Google Sheet",
-        placeholder="https://docs.google.com/spreadsheets/d/...",
+        key="custom_url_input"
     )
 
     if sheet_url and st.button("📂 Charger les feuilles", type="primary"):
