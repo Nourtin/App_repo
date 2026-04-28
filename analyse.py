@@ -1373,3 +1373,73 @@ def get_all_groups(df: pd.DataFrame) -> pd.DataFrame:
     groups["%"] = (groups["Nombre d'appels"] / groups["Nombre d'appels"].sum() * 100).round(1)
     
     return groups
+def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Analyse la fiabilité des données par fournisseur.
+    La colonne fournisseur s'appelle 'list_name'
+    """
+    if "list_name" not in df.columns:
+        return pd.DataFrame()
+
+    # Détecter les colonnes de codes postaux
+    col_client = None
+    col_fournisseur = None
+
+    for col in df.columns:
+        col_lower = col.lower()
+        if col_lower in ["code_postal", "codepostal", "cp_client", "codigo_postal_client"]:
+            col_client = col
+        elif col_lower in ["codigo_postal", "codigopostal", "cp_fournisseur", "codigo_postal_fournisseur"]:
+            col_fournisseur = col
+
+    resultats = []
+
+    for fournisseur in df["list_name"].dropna().unique():
+        df_fourn = df[df["list_name"] == fournisseur].copy()
+        total = len(df_fourn)
+
+        if total == 0:
+            continue
+
+        # Taux de remplissage
+        taux_client = 0
+        taux_fournisseur = 0
+        
+        if col_client:
+            client_valide = df_fourn[col_client].notna() & (df_fourn[col_client].astype(str).str.strip() != "")
+            taux_client = round(client_valide.sum() / total * 100, 1) if total > 0 else 0
+        
+        if col_fournisseur:
+            fourn_valide = df_fourn[col_fournisseur].notna() & (df_fourn[col_fournisseur].astype(str).str.strip() != "")
+            taux_fournisseur = round(fourn_valide.sum() / total * 100, 1) if total > 0 else 0
+
+        # Comparaison (si les deux colonnes existent)
+        nb_comparaisons = 0
+        taux_correspondance = 0
+        
+        if col_client and col_fournisseur:
+            # Nettoyer les codes postaux
+            client_clean = df_fourn[col_client].astype(str).str.replace(r'\D', '', regex=True).str.strip()
+            fourn_clean = df_fourn[col_fournisseur].astype(str).str.replace(r'\D', '', regex=True).str.strip()
+            
+            # Lignes où les deux sont valides
+            client_valide = (client_clean != "") & (client_clean != "nan")
+            fourn_valide = (fourn_clean != "") & (fourn_clean != "nan")
+            les_deux_valides = client_valide & fourn_valide
+            nb_comparaisons = int(les_deux_valides.sum())
+            
+            if nb_comparaisons > 0:
+                correspondance = (client_clean[les_deux_valides] == fourn_clean[les_deux_valides]).sum()
+                taux_correspondance = round(correspondance / nb_comparaisons * 100, 1)
+
+        resultats.append({
+            "list_name": str(fournisseur),  # Utiliser list_name comme colonne fournisseur
+            "total_appels": int(total),
+            "taux_remplissage_client_pct": float(taux_client),
+            "taux_remplissage_fournisseur_pct": float(taux_fournisseur),
+            "nb_comparaisons": int(nb_comparaisons),
+            "taux_correspondance_pct": float(taux_correspondance)
+        })
+
+    df_resultat = pd.DataFrame(resultats)
+    return df_resultat
