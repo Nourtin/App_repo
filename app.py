@@ -19,13 +19,12 @@ from analyse import (
     taux_remplissage_code_postal, comparer_codes_postaux, analyse_fiabilite_par_fournisseur,
     codes_postaux_non_correspondants, analyse_par_type_logement,
     comparer_types_logement, classification_detaillee_par_type, appels_par_piso_casa,
-    analyse_par_type_logement,duree_par_classification_prioritaire
+    duree_par_classification
 )
 from ats_analysis import render_ats_tab
 
 PALETTE = px.colors.qualitative.Set2
 
-# google-generativeai is used via ai_recommendation.py and ats_analysis.py
 # ─────────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────────
@@ -207,7 +206,7 @@ tab1, tab2, tab3, tab4, tab5, tab_ats = st.tabs([
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
     "🏠 Logements",
-    "AI Recommendations",
+    "🤖 AI Recommendations",
     "📋 Analyse des ATS par IA"
 ])
 
@@ -223,17 +222,99 @@ with tab1:
         qualif_mask = df["Classification"].astype(str).str.upper().str.strip().isin([c.upper() for c in classifications_qualif])
         appels_qualifies = qualif_mask.sum()
         taux_qualifie = round(appels_qualifies / len(df) * 100, 1) if len(df) > 0 else 0
-        kpis.get("duree_moyenne_utiles_sec")
     else:
         appels_qualifies = None
         taux_qualifie = None
 
+    # Première ligne : 5 métriques
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Total appels", f"{kpis['total_appels']:,}")
     c2.metric("Appels utiles", f"{kpis['appels_utiles']:,}" if kpis['appels_utiles'] is not None else "—")
     c3.metric("Taux utiles", f"{kpis['taux_utiles_pct']}%" if kpis['taux_utiles_pct'] is not None else "—")
-    c4.metric("Durée moyenne", f"{kpis['duree_moyenne_sec']:.0f}s" if kpis['duree_moyenne_sec'] is not None else "—")
+    c4.metric("Durée moyenne globale", f"{kpis['duree_moyenne_sec']:.0f}s" if kpis['duree_moyenne_sec'] is not None else "—")
     c5.metric("Taux qualification", f"{taux_qualifie}%" if taux_qualifie is not None else "—")
+
+    # Deuxième ligne : Durées par catégorie
+    st.markdown("---")
+    st.subheader("⏱️ Durées moyennes par catégorie")
+    
+    col_d1, col_d2, col_d3, col_d4 = st.columns(4)
+    
+    with col_d1:
+        duree_utiles = kpis.get('duree_moyenne_utiles_sec')
+        st.metric(
+            "📞 Appels utiles", 
+            f"{duree_utiles:.0f}s" if duree_utiles is not None else "—",
+            help="Durée moyenne des appels avec classification valide"
+        )
+    
+    with col_d2:
+        duree_rdv = kpis.get('duree_moyenne_rdv_leads_sec')
+        st.metric(
+            "🎯 RDV Leads", 
+            f"{duree_rdv:.0f}s" if duree_rdv is not None else "—",
+            help="Durée moyenne des appels classifiés 'RDV LEADS'"
+        )
+    
+    with col_d3:
+        duree_tres = kpis.get('duree_moyenne_tres_interesse_sec')
+        st.metric(
+            "🔥 Très intéressé", 
+            f"{duree_tres:.0f}s" if duree_tres is not None else "—",
+            help="Durée moyenne des appels classifiés 'TRES INTERESSE'"
+        )
+    
+    with col_d4:
+        duree_inter = kpis.get('duree_moyenne_interesse_sec')
+        st.metric(
+            "👍 Intéressé", 
+            f"{duree_inter:.0f}s" if duree_inter is not None else "—",
+            help="Durée moyenne des appels classifiés 'INTERESSE'"
+        )
+
+    st.markdown("---")
+    
+    # Graphique des durées par classification
+    st.subheader("📊 Durée moyenne par classification")
+    
+    df_duree_classif = duree_par_classification(df)
+    if not df_duree_classif.empty:
+        # Filtrer pour garder les classifications avec assez d'échantillons
+        df_duree_classif = df_duree_classif[df_duree_classif["count"] >= 5]
+        
+        if not df_duree_classif.empty:
+            fig = px.bar(
+                df_duree_classif.sort_values("duree_moy_sec", ascending=False),
+                x="duree_moy_sec",
+                y="Classification",
+                orientation="h",
+                text="duree_moy_sec",
+                color="duree_moy_sec",
+                color_continuous_scale="Viridis",
+                title="Durée moyenne par type de classification"
+            )
+            fig.update_traces(texttemplate="%{text:.0f}s", textposition="outside")
+            fig.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Afficher aussi sous forme de tableau
+            with st.expander("📑 Tableau détaillé des durées par classification"):
+                st.dataframe(
+                    df_duree_classif.rename(columns={
+                        "Classification": "Classification",
+                        "count": "Nombre d'appels",
+                        "duree_moy_sec": "Durée moyenne (s)",
+                        "duree_mediane_sec": "Durée médiane (s)",
+                        "duree_min_sec": "Durée min (s)",
+                        "duree_max_sec": "Durée max (s)"
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+        else:
+            st.info("Pas assez de données par classification")
+    else:
+        st.info("Colonne Duration_seconds non trouvée")
 
     st.markdown("---")
     col_j, col_m = st.columns(2)
@@ -657,7 +738,7 @@ with tab4:
 # TAB 5 — AI RECOMMENDATIONS
 # ══════════════════════════════════════════════
 with tab5:
-    st.header("IA Décisionnelle - Recommandations Intelligentes")
+    st.header("🤖 IA Décisionnelle - Recommandations Intelligentes")
     st.markdown("---")
 
     with st.expander("📊 Aperçu des données", expanded=False):
@@ -691,10 +772,10 @@ with tab5:
                 st.error("Échec de l'analyse")
 
     st.markdown("---")
-    sub_tab1, sub_tab2, sub_tab3 = st.tabs(["Analyse Horaires", "Analyse Fournisseurs", "Analyse Logements"])
+    sub_tab1, sub_tab2, sub_tab3 = st.tabs(["⏰ Analyse Horaires", "🏢 Analyse Fournisseurs", "🏠 Analyse Logements"])
 
     with sub_tab1:
-        st.subheader("Analyse des horaires")
+        st.subheader("⏰ Analyse des horaires")
         df_h_raw = appels_par_heure(df)
 
         if not df_h_raw.empty:
@@ -762,7 +843,7 @@ with tab5:
                     col_f1, col_f2, col_f3 = st.columns(3)
                     col_f1.metric("Fournisseurs analysés", len(df_f_ia))
                     col_f2.metric("🏆 Meilleur taux", f"{meilleur['taux_classification']}%", meilleur['nom'])
-                    col_f3.metric("À améliorer", f"{pire['taux_classification']}%", pire['nom'])
+                    col_f3.metric("⚠️ À améliorer", f"{pire['taux_classification']}%", pire['nom'])
                     st.dataframe(df_f_ia.sort_values("taux_classification", ascending=False), use_container_width=True)
                     fig = px.bar(df_f_ia.sort_values("taux_classification"), x="taux_classification", y="nom",
                                  orientation="h", color="taux_classification", color_continuous_scale="RdYlGn")
@@ -829,13 +910,13 @@ with tab5:
             st.info(resultat["prediction"])
 
         if "resume_executif" in resultat:
-            st.subheader("Résumé exécutif")
+            st.subheader("📌 Résumé exécutif")
             st.info(resultat["resume_executif"])
 
         if "actions_prioritaires" in resultat:
             st.subheader("🚀 Actions prioritaires")
             for action in resultat["actions_prioritaires"]:
-                st.markdown(f"**{action['action']}**  \n Pourquoi: {action['pourquoi']}  \n Impact: {action['impact']}")
+                st.markdown(f"**👉 {action['action']}**  \n📌 Pourquoi: {action['pourquoi']}  \n🎯 Impact: {action['impact']}")
 
         st.markdown("---")
         st.download_button("📥 Export JSON", data=json.dumps(resultat, ensure_ascii=False, indent=2),
