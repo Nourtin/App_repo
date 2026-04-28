@@ -34,7 +34,8 @@ from analyse import (
     _mapper_type_logement,
      get_detail_by_group,
     _est_utile, _est_qualifie,
-    analyse_fiabilite_par_fournisseur
+    analyse_fiabilite_par_fournisseur,
+    _sanitize_for_display
 )
 from ats_analysis import render_ats_tab
 
