@@ -61,7 +61,11 @@ def _taux_qualification(df: pd.DataFrame):
     nb = int(mask.sum())
     taux = round(nb / len(df) * 100, 1)
     return nb, taux
-
+def get_fournisseurs_list(df: pd.DataFrame) -> List[str]:
+    """Retourne la liste triée des fournisseurs (toujours en string)"""
+    if "list_name" not in df.columns:
+        return []
+    return sorted(df["list_name"].dropna().astype(str).unique().tolist())
 
 def _sanitize_for_display(df_in: pd.DataFrame) -> pd.DataFrame:
     """
@@ -575,7 +579,7 @@ with tab2:
             else:
                 # Récupérer la liste des fournisseurs sans erreur de type
                 if "list_name" in df.columns:
-                    fournisseurs_list = sorted(df["list_name"].dropna().astype(str).unique().tolist())
+                    fournisseurs_list = = get_fournisseurs_list(df)
                 else:
                     fournisseurs_list = []
                 
