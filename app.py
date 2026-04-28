@@ -745,79 +745,331 @@ with tab3:
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
 
+# ══════════════════════════════════════════════
+# TAB 4 — LOGEMENTS (avec regroupement et drill-down)
+# ══════════════════════════════════════════════
 with tab4:
     st.header("🏠 Analyse des logements")
 
     if "piso_casa" not in df.columns and "tipo_vivienda" not in df.columns:
         st.warning("Colonne 'piso_casa' ou 'tipo_vivienda' non trouvée")
     else:
+        # Déterminer la colonne à utiliser
         col_logement = "tipo_vivienda" if "tipo_vivienda" in df.columns else "piso_casa"
+        
+        # Appliquer le regroupement
         df_log = df.copy()
         df_log["type_groupe"], df_log["type_detail"] = _mapper_type_logement(df_log[col_logement])
         
-        st.subheader("📊 Vue d'ensemble par type de logement")
+        # Option d'affichage
+        st.subheader("📊 Vue d'ensemble")
         
-        analyse_types = analyse_par_type_logement(df, regrouper=True)
+        # Premier graphique : répartition générale
+        col_vue1, col_vue2 = st.columns(2)
         
-        if "error" not in analyse_types:
-            df_comparaison = comparer_types_logement(df, regrouper=True)
+        with col_vue1:
+            group_counts = df_log["type_groupe"].value_counts().reset_index()
+            group_counts.columns = ["Groupe", "Nombre d'appels"]
+            group_counts["%"] = (group_counts["Nombre d'appels"] / group_counts["Nombre d'appels"].sum() * 100).round(1)
             
-            # TOUT LE CODE QUI UTILISE df_comparaison EST DANS CE BLOC
-            if not df_comparaison.empty:
-                # Métriques
-                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-                col_m1.metric("Types de logement", len(df_comparaison))
-                col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
+            fig = px.pie(
+                group_counts,
+                names="Groupe",
+                values="Nombre d'appels",
+                title="Répartition par groupe de logement",
+                color_discrete_sequence=PALETTE,
+                hole=0.3
+            )
+            fig.update_traces(textinfo="percent+label")
+            fig.update_layout(showlegend=True)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col_vue2:
+            fig = px.bar(
+                group_counts.sort_values("Nombre d'appels", ascending=True),
+                x="Nombre d'appels",
+                y="Groupe",
+                orientation="h",
+                text="%",
+                color="Nombre d'appels",
+                color_continuous_scale="Blues",
+                title="Nombre d'appels par groupe"
+            )
+            fig.update_traces(texttemplate="%{text}%", textposition="outside")
+            fig.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Switch entre vue regroupée et vue détaillée
+        st.markdown("---")
+        view_mode = st.radio(
+            "🔍 Mode d'affichage détaillé",
+            options=["📦 Vue par groupe (regroupée)", "📋 Vue par type original (détaillée)"],
+            horizontal=True,
+            key="view_mode_tab4"
+        )
+        
+        if view_mode == "📦 Vue par groupe (regroupée)":
+            # ==========================================
+            # VUE REGROUPÉE
+            # ==========================================
+            st.subheader("📊 Analyse par groupe de logement")
+            
+            # Statistiques par groupe
+            st.dataframe(group_counts, use_container_width=True, hide_index=True)
+            
+            # Métriques par groupe
+            st.markdown("---")
+            st.subheader("📈 Métriques par groupe")
+            
+            # Calculer les métriques par groupe
+            group_metrics = []
+            for groupe in df_log["type_groupe"].unique():
+                df_g = df_log[df_log["type_groupe"] == groupe]
+                total = len(df_g)
                 
-                # Trouver la bonne colonne pour le taux
-                taux_col = 'taux_qualifies_pct' if 'taux_qualifies_pct' in df_comparaison.columns else 'taux_qualifies'
-                
-                if taux_col in df_comparaison.columns:
-                    idx_max = df_comparaison[taux_col].idxmax()
-                    idx_min = df_comparaison[taux_col].idxmin()
-                    col_m3.metric("🏆 Meilleur taux", f"{df_comparaison.loc[idx_max, taux_col]}%", df_comparaison.loc[idx_max, 'type_logement'])
-                    col_m4.metric("⚠️ Plus faible", f"{df_comparaison.loc[idx_min, taux_col]}%", df_comparaison.loc[idx_min, 'type_logement'])
+                if "Classification" in df.columns:
+                    utiles = _est_utile(df_g["Classification"]).sum()
+                    taux_utiles = round(utiles / total * 100, 1) if total > 0 else 0
+                    qualifies = _est_qualifie(df_g["Classification"]).sum()
+                    taux_qualifies = round(qualifies / total * 100, 1) if total > 0 else 0
+                    rdv = (df_g["Classification"].astype(str).str.upper() == "RDV LEADS").sum()
+                    tres = (df_g["Classification"].astype(str).str.upper() == "TRES INTERESSE").sum()
+                    inter = (df_g["Classification"].astype(str).str.upper() == "INTERESSE").sum()
                 else:
-                    col_m3.metric("🏆 Meilleur taux", "—")
-                    col_m4.metric("⚠️ Plus faible", "—")
+                    utiles = 0
+                    taux_utiles = 0
+                    qualifies = 0
+                    taux_qualifies = 0
+                    rdv = tres = inter = 0
                 
-                st.markdown("---")
-                col_g1, col_g2 = st.columns(2)
-                
-                with col_g1:
-                    if taux_col in df_comparaison.columns:
-                        df_plot = df_comparaison.sort_values(taux_col)
-                        fig = px.bar(df_plot, x=taux_col, y="type_logement",
-                                     orientation="h", text=taux_col, color=taux_col,
-                                     color_continuous_scale="RdYlGn")
-                        fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                        fig.update_layout(coloraxis_showscale=False)
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                with col_g2:
-                    fig = px.bar(df_comparaison.sort_values("total_appels"), x="total_appels", y="type_logement",
-                                 orientation="h", text="total_appels", color="total_appels",
-                                 color_continuous_scale="Blues")
-                    fig.update_traces(textposition="outside")
-                    fig.update_layout(coloraxis_showscale=False)
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                st.markdown("---")
-                st.dataframe(
-                    df_comparaison.rename(columns={
-                        "type_logement": "Type de logement",
-                        "total_appels": "Total appels",
-                        "appels_valides": "Appels valides",
-                        "taux_valides_pct": "Taux valides (%)",
-                        "appels_qualifies": "Appels qualifiés",
-                        "taux_qualifies_pct": "Taux qualification (%)"
-                    }),
-                    use_container_width=True, hide_index=True
+                group_metrics.append({
+                    "Groupe": groupe,
+                    "Total": total,
+                    "Taux utiles": f"{taux_utiles}%",
+                    "Taux qualifiés": f"{taux_qualifies}%",
+                    "RDV Leads": rdv,
+                    "Très intéressé": tres,
+                    "Intéressé": inter
+                })
+            
+            df_metrics = pd.DataFrame(group_metrics)
+            st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+            
+            # Graphique comparatif des taux
+            col_comp1, col_comp2 = st.columns(2)
+            with col_comp1:
+                fig = px.bar(
+                    df_metrics,
+                    x="Groupe",
+                    y="Taux qualifiés",
+                    title="Taux de qualification par groupe",
+                    color="Taux qualifiés",
+                    color_continuous_scale="RdYlGn",
+                    text="Taux qualifiés"
                 )
-            else:
-                st.info("Aucune donnée de comparaison disponible")
+                fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col_comp2:
+                fig = px.bar(
+                    df_metrics,
+                    x="Groupe",
+                    y="RDV Leads",
+                    title="Nombre de RDV Leads par groupe",
+                    color="RDV Leads",
+                    color_continuous_scale="Viridis",
+                    text="RDV Leads"
+                )
+                fig.update_traces(texttemplate="%{text}", textposition="outside")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            # Drill-down
+            st.markdown("---")
+            st.subheader("🔍 Drill-down : voir les détails d'un groupe")
+            
+            groupes = sorted(df_log["type_groupe"].dropna().unique())
+            selected_groupe = st.selectbox(
+                "Choisissez un groupe pour voir ses sous-types",
+                groupes,
+                key="drilldown_tab4"
+            )
+            
+            if selected_groupe:
+                details = get_detail_by_group(df_log, selected_groupe)
+                if not details.empty:
+                    st.write(f"**📋 Détail des sous-types pour '{selected_groupe}' :**")
+                    
+                    col_d1, col_d2 = st.columns(2)
+                    with col_d1:
+                        st.dataframe(details, use_container_width=True, hide_index=True)
+                    
+                    with col_d2:
+                        fig = px.bar(
+                            details,
+                            x="Type original",
+                            y="Nombre d'appels",
+                            text="%",
+                            color="Nombre d'appels",
+                            color_continuous_scale="Viridis",
+                            title=f"Sous-types de {selected_groupe}"
+                        )
+                        fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                        fig.update_layout(xaxis_tickangle=-45)
+                        st.plotly_chart(fig, use_container_width=True)
+        
         else:
-            st.info(analyse_types.get("error", "Erreur dans l'analyse"))
+            # ==========================================
+            # VUE DÉTAILLÉE (types originaux)
+            # ==========================================
+            st.subheader("📋 Analyse par type original (détaillé)")
+            
+            detail_counts = df_log["type_detail"].value_counts().reset_index()
+            detail_counts.columns = ["Type de logement", "Nombre d'appels"]
+            detail_counts["%"] = (detail_counts["Nombre d'appels"] / detail_counts["Nombre d'appels"].sum() * 100).round(1)
+            
+            top_n = 15
+            detail_counts_top = detail_counts.head(top_n)
+            autres = detail_counts.iloc[top_n:]
+            
+            if not autres.empty:
+                autres_count = autres["Nombre d'appels"].sum()
+                autres_pct = autres["%"].sum()
+                detail_counts_top = pd.concat([
+                    detail_counts_top,
+                    pd.DataFrame({"Type de logement": ["AUTRES"], "Nombre d'appels": [autres_count], "%": [round(autres_pct, 1)]})
+                ], ignore_index=True)
+            
+            col_d1, col_d2 = st.columns(2)
+            with col_d1:
+                fig = px.pie(
+                    detail_counts_top,
+                    names="Type de logement",
+                    values="Nombre d'appels",
+                    title=f"Top {top_n} des types de logement",
+                    color_discrete_sequence=PALETTE,
+                    hole=0.3
+                )
+                fig.update_traces(textinfo="percent+label")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col_d2:
+                fig = px.bar(
+                    detail_counts_top.sort_values("Nombre d'appels", ascending=True),
+                    x="Nombre d'appels",
+                    y="Type de logement",
+                    orientation="h",
+                    text="%",
+                    color="Nombre d'appels",
+                    color_continuous_scale="Blues",
+                    title="Nombre d'appels par type"
+                )
+                fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                fig.update_layout(coloraxis_showscale=False)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with st.expander("📑 Voir tous les types détaillés"):
+                st.dataframe(detail_counts, use_container_width=True, hide_index=True)
+            
+            # Métriques par type original (top 10)
+            st.markdown("---")
+            st.subheader("📈 Top 10 des types - Métriques de qualification")
+            
+            top_10_types = detail_counts.head(10)["Type de logement"].tolist()
+            df_top_types = df_log[df_log["type_detail"].isin(top_10_types)]
+            
+            if "Classification" in df.columns and not df_top_types.empty:
+                top_metrics = []
+                for type_val in top_10_types:
+                    df_t = df_top_types[df_top_types["type_detail"] == type_val]
+                    total = len(df_t)
+                    
+                    utiles = _est_utile(df_t["Classification"]).sum()
+                    taux_utiles = round(utiles / total * 100, 1) if total > 0 else 0
+                    qualifies = _est_qualifie(df_t["Classification"]).sum()
+                    taux_qualifies = round(qualifies / total * 100, 1) if total > 0 else 0
+                    rdv = (df_t["Classification"].astype(str).str.upper() == "RDV LEADS").sum()
+                    tres = (df_t["Classification"].astype(str).str.upper() == "TRES INTERESSE").sum()
+                    inter = (df_t["Classification"].astype(str).str.upper() == "INTERESSE").sum()
+                    
+                    top_metrics.append({
+                        "Type": type_val,
+                        "Total": total,
+                        "Taux utiles": f"{taux_utiles}%",
+                        "Taux qualifiés": f"{taux_qualifies}%",
+                        "RDV": rdv,
+                        "Très int.": tres,
+                        "Intéressé": inter
+                    })
+                
+                df_top_metrics = pd.DataFrame(top_metrics)
+                st.dataframe(df_top_metrics, use_container_width=True, hide_index=True)
+        
+        # ==========================================
+        # SECTION COMMUNE : Classifications prioritaires
+        # ==========================================
+        st.markdown("---")
+        st.subheader("🎯 Classifications prioritaires")
+        
+        if "Classification" in df.columns:
+            df_classif = df_log[df_log["Classification"].notna()]
+            df_classif = df_classif[~df_classif["Classification"].astype(str).str.lower().isin(["non trouvé", "non trouve", ""])]
+            
+            if not df_classif.empty:
+                level_choice = st.radio(
+                    "Niveau d'analyse",
+                    options=["Par groupe", "Par type détaillé"],
+                    horizontal=True,
+                    key="priority_level_tab4"
+                )
+                
+                if level_choice == "Par groupe":
+                    col_analyse = "type_groupe"
+                else:
+                    col_analyse = "type_detail"
+                    top_types = df_classif[col_analyse].value_counts().head(10).index
+                    df_classif = df_classif[df_classif[col_analyse].isin(top_types)]
+                
+                stats = []
+                for type_val in df_classif[col_analyse].unique():
+                    df_type = df_classif[df_classif[col_analyse] == type_val]
+                    total = len(df_type)
+                    
+                    rdv = (df_type["Classification"].astype(str).str.upper() == "RDV LEADS").sum()
+                    tres = (df_type["Classification"].astype(str).str.upper() == "TRES INTERESSE").sum()
+                    inter = (df_type["Classification"].astype(str).str.upper() == "INTERESSE").sum()
+                    
+                    stats.append({
+                        "Type": type_val,
+                        "Total appels": total,
+                        "RDV LEADS": f"{rdv} ({round(rdv/total*100,1)}%)" if total > 0 else "0 (0%)",
+                        "TRES INTERESSE": f"{tres} ({round(tres/total*100,1)}%)" if total > 0 else "0 (0%)",
+                        "INTERESSE": f"{inter} ({round(inter/total*100,1)}%)" if total > 0 else "0 (0%)"
+                    })
+                
+                df_stats = pd.DataFrame(stats)
+                st.dataframe(df_stats, use_container_width=True, hide_index=True)
+                
+                if len(stats) > 0:
+                    df_plot = pd.DataFrame(stats)
+                    df_plot["RDV_num"] = df_plot["RDV LEADS"].apply(lambda x: int(x.split(" ")[0]) if x != "0 (0%)" else 0)
+                    df_plot["TRES_num"] = df_plot["TRES INTERESSE"].apply(lambda x: int(x.split(" ")[0]) if x != "0 (0%)" else 0)
+                    df_plot["INTER_num"] = df_plot["INTERESSE"].apply(lambda x: int(x.split(" ")[0]) if x != "0 (0%)" else 0)
+                    
+                    fig = px.bar(
+                        df_plot,
+                        x="Type",
+                        y=["RDV_num", "TRES_num", "INTER_num"],
+                        title="Comparaison des classifications prioritaires",
+                        barmode="group",
+                        labels={"value": "Nombre d'appels", "variable": "Classification"},
+                        color_discrete_sequence=["#e74c3c", "#e67e22", "#2ecc71"]
+                    )
+                    fig.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Aucune classification valide trouvée")
+        else:
+            st.info("Colonne 'Classification' non trouvée")
 # ══════════════════════════════════════════════
 # TAB 5 — AI RECOMMENDATIONS
 # ══════════════════════════════════════════════
