@@ -532,21 +532,10 @@ with tab3:
     df_fiabilite = analyse_fiabilite_par_fournisseur(df)
 
     if not df_fiabilite.empty:
-        col_rename = {}
-        for col in df_fiabilite.columns:
-            col_lower = col.lower()
-            if "list_name" in col_lower or "fournisseur" in col_lower:
-                col_rename[col] = "Fournisseur"
-            elif "total_appels" in col_lower:
-                col_rename[col] = "Total appels"
-            elif "taux_remplissage_client" in col_lower:
-                col_rename[col] = "Taux client (%)"
-            elif "taux_remplissage_fournisseur" in col_lower:
-                col_rename[col] = "Taux fournisseur (%)"
-            elif "nb_comparaisons" in col_lower:
-                col_rename[col] = "Nb comparaisons"
-            elif "taux_correspondance" in col_lower:
-                col_rename[col] = "Taux correspondance (%)"
+        # Afficher directement sans renommage pour éviter les doublons
+        st.dataframe(_sanitize_for_display(df_fiabilite), use_container_width=True, hide_index=True)
+
+    
         
         df_display = _sanitize_for_display(df_fiabilite.rename(columns=col_rename))
         st.dataframe(df_display, use_container_width=True, hide_index=True)
