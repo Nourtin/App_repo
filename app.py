@@ -33,7 +33,9 @@ from analyse import (
     duree_par_classification,
     _mapper_type_logement,
     _est_utile,
-    _est_qualifie
+    _est_qualifie,
+    get_detail_by_group
+    
 )
 from ats_analysis import render_ats_tab
 
