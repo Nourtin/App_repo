@@ -691,7 +691,8 @@ with tab3:
                 col_rename[col] = "Nb comparaisons"
             elif "taux_correspondance" in col_lower:
                 col_rename[col] = "Taux correspondance (%)"
-
+        # Ajoutez ceci avant la ligne 695
+        df_comparaison = comparer_types_logement(df, regrouper=True)
         df_display = _sanitize_for_display(df_fiabilite.rename(columns=col_rename))
         st.dataframe(df_display, use_container_width=True, hide_index=True)
         col_g1, col_g2 = st.columns(2)
