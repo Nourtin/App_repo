@@ -288,13 +288,38 @@ with tab1:
     c5.metric("Taux qualification", f"{taux_qualifie}%" if taux_qualifie is not None else "—")
 
     # Ligne 2 : Durées par catégorie
+    # Ligne 2 : Durées par catégorie
     st.markdown("---")
     st.subheader("⏱️ Durées moyennes par catégorie")
     col_d1, col_d2, col_d3, col_d4 = st.columns(4)
-    col_d1.metric("📞 Appels utiles", f"{kpis['duree_moyenne_utiles_sec']:.0f}s" if kpis.get("duree_moyenne_utiles_sec") else "—")
-    col_d2.metric("🎯 RDV Leads", f"{kpis['duree_moyenne_rdv_leads_sec']:.0f}s" if kpis.get("duree_moyenne_rdv_leads_sec") else "—")
-    col_d3.metric("🔥 Très intéressé", f"{kpis['duree_moyenne_tres_interesse_sec']:.0f}s" if kpis.get("duree_moyenne_tres_interesse_sec") else "—")
-    col_d4.metric("👍 Intéressé", f"{kpis['duree_moyenne_interesse_sec']:.0f}s" if kpis.get("duree_moyenne_interesse_sec") else "—")
+    
+    with col_d1:
+        duree_utiles = kpis.get('duree_moyenne_utiles_sec')
+        if duree_utiles and not pd.isna(duree_utiles):
+            st.metric("📞 Appels utiles", f"{duree_utiles:.0f}s", help="Durée moyenne des appels avec classification valide")
+        else:
+            st.metric("📞 Appels utiles", "—", help="Pas assez de données")
+    
+    with col_d2:
+        duree_rdv = kpis.get('duree_moyenne_rdv_leads_sec')
+        if duree_rdv and not pd.isna(duree_rdv) and duree_rdv > 0:
+            st.metric("🎯 RDV Leads", f"{duree_rdv:.0f}s", help="Durée moyenne des appels classifiés 'RDV LEADS'")
+        else:
+            st.metric("🎯 RDV Leads", "—", help="Aucun appel RDV LEADS trouvé")
+    
+    with col_d3:
+        duree_tres = kpis.get('duree_moyenne_tres_interesse_sec')
+        if duree_tres and not pd.isna(duree_tres) and duree_tres > 0:
+            st.metric("🔥 Très intéressé", f"{duree_tres:.0f}s", help="Durée moyenne des appels classifiés 'TRES INTERESSE'")
+        else:
+            st.metric("🔥 Très intéressé", "—", help="Pas assez de données")
+    
+    with col_d4:
+        duree_inter = kpis.get('duree_moyenne_interesse_sec')
+        if duree_inter and not pd.isna(duree_inter) and duree_inter > 0:
+            st.metric("👍 Intéressé", f"{duree_inter:.0f}s", help="Durée moyenne des appels classifiés 'INTERESSE'")
+        else:
+            st.metric("👍 Intéressé", "—", help="Pas assez de données")
 
     st.markdown("---")
 
