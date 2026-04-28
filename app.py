@@ -125,6 +125,36 @@ with st.sidebar:
         3. Dans **"Accès général"**, sélectionnez : **"Toute personne disposant du lien"**
         4. Copiez le lien et collez-le ci-dessous
         """)
+    # URLs prédéfinies
+    st.markdown("**📌 URLs prédéfinies :**")
+    
+    col_url1, col_url2 = st.columns(2)
+    
+    with col_url1:
+        if st.button("📊 URL 1", use_container_width=True, key="url1_btn"):
+            sheet_url = "https://docs.google.com/spreadsheets/d/1cgWINKu7diFGkAOWs9ZZq09CvanDeYKA3dLjOSzTng4/edit?usp=sharing"
+            st.session_state.sheet_url = sheet_url
+            st.rerun()
+    
+    with col_url2:
+        if st.button("📊 URL 2", use_container_width=True, key="url2_btn"):
+            sheet_url = "https://docs.google.com/spreadsheets/d/DEUXIEME_URL"
+            st.session_state.sheet_url = sheet_url
+            st.rerun()
+    
+    # URLs personnalisées
+    st.markdown("**✏️ Ou entrez votre propre URL :**")
+    
+    # Utiliser session state pour garder l'URL
+    if "sheet_url" not in st.session_state:
+        st.session_state.sheet_url = ""
+    
+    sheet_url = st.text_input(
+        "URL du Google Sheet",
+        value=st.session_state.sheet_url,
+        placeholder="https://docs.google.com/spreadsheets/d/...",
+        key="sheet_url_input"
+    )
 
     sheet_url = st.text_input(
         "URL du Google Sheet",
