@@ -531,14 +531,14 @@ with tab3:
     st.subheader("🏢 Fiabilité par fournisseur")
     df_fiabilite = analyse_fiabilite_par_fournisseur(df)
 
-    if not df_fiabilite.empty:
-        # Afficher directement sans renommage pour éviter les doublons
-        st.dataframe(_sanitize_for_display(df_fiabilite), use_container_width=True, hide_index=True)
-
     
-        
-        df_display = _sanitize_for_display(df_fiabilite.rename(columns=col_rename))
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+    
+    
+    if not df_fiabilite.empty:
+        # Afficher directement sans renommage pour éviter les erreurs
+        st.dataframe(_sanitize_for_display(df_fiabilite), use_container_width=True, hide_index=True)
+    else:
+        st.info("Données insuffisantes pour analyser la fiabilité par fournisseur")
 
     st.markdown("---")
     st.subheader("🔍 Codes postaux non correspondants")
