@@ -466,6 +466,10 @@ with tab1:
 # TAB 2 — PAR FOURNISSEUR (à conserver tel quel)
 # ══════════════════════════════════════════════
 
+# ══════════════════════════════════════════════
+# TAB 2 — PAR FOURNISSEUR
+# ══════════════════════════════════════════════
+
 with tab2:
     st.header("Analyse par fournisseur (list_name)")
     df_fourn = appels_par_fournisseur(df)
@@ -486,6 +490,182 @@ with tab2:
             })),
             use_container_width=True, hide_index=True,
         )
+
+        st.markdown("---")
+        col_a, col_b = st.columns(2)
+
+        with col_a:
+            st.subheader("📈 Nombre d'appels par fournisseur")
+            fig = px.bar(df_fourn.sort_values("nb_appels"), x="nb_appels", y="list_name",
+                         orientation="h", text="nb_appels", color_discrete_sequence=[PALETTE[0]])
+            fig.update_traces(textposition="outside")
+            fig.update_layout(yaxis_title="", xaxis_title="Appels", margin=dict(t=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col_b:
+            st.subheader("Taux d'appels qualifiés (%)")
+            fig = px.bar(df_fourn.sort_values("taux_qualifies_pct"), x="taux_qualifies_pct", y="list_name",
+                         orientation="h", text="taux_qualifies_pct", color="taux_qualifies_pct",
+                         color_continuous_scale="Greens")
+            fig.update_traces(texttemplate="%{text}%", textposition="outside")
+            fig.update_layout(yaxis_title="", xaxis_title="%", margin=dict(t=10), coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("⏱️ Durée moyenne d'appel par fournisseur (secondes)")
+        fig = px.bar(df_fourn.sort_values("duree_moy_sec"), x="duree_moy_sec", y="list_name",
+                     orientation="h", text="duree_moy_sec", color_discrete_sequence=[PALETTE[3]])
+        fig.update_traces(textposition="outside")
+        fig.update_layout(yaxis_title="", xaxis_title="Secondes", margin=dict(t=10))
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("📋 Répartition des classifications par fournisseur")
+        df_cls_fourn = classification_par_fournisseur(df)
+        if not df_cls_fourn.empty:
+            fig = px.bar(df_cls_fourn, x="pct", y="list_name", color="Classification",
+                         orientation="h", text="count", color_discrete_sequence=PALETTE, barmode="stack")
+            fig.update_traces(textposition="inside", insidetextanchor="middle")
+            fig.update_layout(yaxis_title="", xaxis_title="% des appels utiles",
+                              legend_title="Classification", margin=dict(t=10))
+            st.plotly_chart(fig, use_container_width=True)
+
+            with st.expander("📑 Voir le tableau détaillé"):
+                pivot = df_cls_fourn.pivot_table(
+                    index="list_name", columns="Classification", values="count", fill_value=0
+                )
+                st.dataframe(pivot, use_container_width=True)
+        else:
+            st.info("Aucune donnée de classification valide.")
+
+        # ── Analyse logements par fournisseur ──
+        st.markdown("---")
+        st.subheader("🏠 Analyse des types de logement par fournisseur")
+
+        col_logement = next(
+            (c for c in ["tipo_vivienda", "piso_casa"] if c in df.columns), None
+        )
+
+        if col_logement is None:
+            st.info("Colonne 'tipo_vivienda' ou 'piso_casa' non trouvée.")
+        else:
+            use_grouping = st.checkbox(
+                "📦 Regrouper les types similaires", value=True,
+                key="grouping_checkbox_tab2",
+                help="Regroupe automatiquement les types (PISO, CASA, etc.)"
+            )
+
+            df_log_temp = df.copy()
+            df_log_temp["type_groupe"], df_log_temp["type_detail"] = _mapper_type_logement(df_log_temp[col_logement])
+            col_analyse = "type_groupe" if use_grouping else "type_detail"
+
+            # Nettoyage
+            df_log_temp = df_log_temp[
+                df_log_temp[col_analyse].notna() &
+                (df_log_temp[col_analyse].astype(str).str.strip() != "") &
+                (df_log_temp[col_analyse].astype(str) != "nan")
+            ]
+
+            if df_log_temp.empty:
+                st.info("Aucune donnée sur les types de logement.")
+            else:
+                fournisseurs_list = get_fournisseurs_list(df)
+                
+                selected_fournisseur = st.selectbox(
+                    "Choisissez un fournisseur",
+                    ["Tous les fournisseurs"] + fournisseurs_list,
+                    key="logement_fournisseur_select_tab2",
+                )
+                
+                df_filtered = df_log_temp if selected_fournisseur == "Tous les fournisseurs" else df_log_temp[df_log_temp["list_name"].astype(str) == selected_fournisseur]
+
+                # Métriques
+                col_log1, col_log2, col_log3 = st.columns(3)
+                col_log1.metric("Appels avec type logement", f"{len(df_filtered):,}")
+                col_log2.metric("Types différents", df_filtered[col_analyse].nunique())
+                top_type = df_filtered[col_analyse].mode().iloc[0] if not df_filtered.empty else "N/A"
+                col_log3.metric("Type le plus fréquent", top_type)
+
+                st.markdown("---")
+                col_chart1, col_chart2 = st.columns(2)
+
+                with col_chart1:
+                    st.subheader("🥧 Répartition par type")
+                    counts = df_filtered[col_analyse].value_counts()
+                    fig_pie = px.pie(values=counts.values, names=counts.index,
+                                    title="Répartition des logements",
+                                    color_discrete_sequence=PALETTE, hole=0.3)
+                    fig_pie.update_traces(textinfo="percent+label")
+                    st.plotly_chart(fig_pie, use_container_width=True)
+
+                with col_chart2:
+                    st.subheader("📊 Top types")
+                    df_top = df_filtered[col_analyse].value_counts().head(10).reset_index()
+                    df_top.columns = ["Type de logement", "Nombre d'appels"]
+                    fig_bar = px.bar(df_top, x="Nombre d'appels", y="Type de logement",
+                                    orientation="h", text="Nombre d'appels",
+                                    color="Nombre d'appels", color_continuous_scale="Blues")
+                    fig_bar.update_traces(textposition="outside")
+                    fig_bar.update_layout(coloraxis_showscale=False)
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                # Drill-down (mode regroupé uniquement)
+                if use_grouping:
+                    st.markdown("---")
+                    st.subheader("🔍 Drill-down par type")
+                    groupes_disponibles = sorted(df_filtered[col_analyse].unique())
+                    selected_groupe = st.selectbox(
+                        "Choisissez un groupe pour voir les sous-types",
+                        groupes_disponibles, key="drilldown_select_tab2",
+                    )
+                    if selected_groupe:
+                        details = _get_detail_by_group(df_filtered, selected_groupe)
+                        if not details.empty:
+                            st.dataframe(details, use_container_width=True, hide_index=True)
+                            fig = px.bar(details, x="Type original", y="Nombre d'appels",
+                                        text="%", color="Nombre d'appels",
+                                        color_continuous_scale="Viridis")
+                            fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                            fig.update_layout(xaxis_tickangle=-45)
+                            st.plotly_chart(fig, use_container_width=True)
+
+                # Classification par type de logement
+                if "Classification" in df.columns:
+                    st.markdown("---")
+                    st.subheader("🎯 Classification des appels par type de logement")
+                    df_classif = df_filtered[
+                        df_filtered["Classification"].notna() &
+                        ~df_filtered["Classification"].astype(str).str.lower().isin(["non trouvé", "non trouve", ""])
+                    ]
+                    if not df_classif.empty:
+                        top_types = df_classif[col_analyse].value_counts().head(5).index
+                        cross_classif = pd.crosstab(
+                            df_classif[df_classif[col_analyse].isin(top_types)][col_analyse],
+                            df_classif[df_classif[col_analyse].isin(top_types)]["Classification"],
+                        )
+                        fig_classif = px.bar(cross_classif, barmode="group",
+                                            title="Classifications par type de logement (Top 5)",
+                                            color_discrete_sequence=PALETTE)
+                        st.plotly_chart(fig_classif, use_container_width=True)
+                        with st.expander("📑 Voir le tableau détaillé"):
+                            st.dataframe(cross_classif, use_container_width=True)
+
+                # Récapitulatif par fournisseur (tous)
+                if selected_fournisseur == "Tous les fournisseurs" and "list_name" in df_filtered.columns:
+                    st.markdown("---")
+                    st.subheader("📋 Récapitulatif par fournisseur")
+                    df_pivot = pd.crosstab(
+                        df_filtered["list_name"], df_filtered[col_analyse], normalize="index"
+                    ) * 100
+                    st.dataframe(
+                        df_pivot.round(1).style.format("{:.1f}%"),
+                        use_container_width=True, height=400,
+                    )
+                    csv = df_pivot.to_csv().encode("utf-8")
+                    st.download_button(
+                        "📥 Exporter les données", data=csv,
+                        file_name="logement_par_fournisseur.csv", mime="text/csv",
+                    )
 
         # ... (reste du TAB 2 inchangé) ...
 
