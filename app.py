@@ -585,9 +585,8 @@ with tab2:
                     key="logement_fournisseur_select_tab2",
                 )
                 
-                df_filtered = df_log_temp 
-                if selected_fournisseur == "Tous les fournisseurs"
-                else df_log_temp[df_log_temp["list_name"].astype(str) == selected_fournisseur]
+                
+                df_filtered = df_log_temp if selected_fournisseur == "Tous les fournisseurs" else df_log_temp[df_log_temp["list_name"].astype(str) == selected_fournisseur]
 
                
 
