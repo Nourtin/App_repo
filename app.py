@@ -686,29 +686,38 @@ with tab3:
 
         df_display = _sanitize_for_display(df_fiabilite.rename(columns=col_rename))
         st.dataframe(df_display, use_container_width=True, hide_index=True)
-
         col_g1, col_g2 = st.columns(2)
 
         with col_g1:
-            if "Fournisseur" in df_display.columns:
-                df_plot = pd.DataFrame({
-                    "Fournisseur": df_display["Fournisseur"],
-                    "Taux client": df_display.get("Taux remplissage client (%)", 0),
-                    "Taux fournisseur": df_display.get("Taux remplissage fournisseur (%)", 0),
-                })
-                df_melt = df_plot.melt(id_vars=["Fournisseur"], var_name="Source", value_name="Taux (%)")
-                fig = px.bar(df_melt, x="Fournisseur", y="Taux (%)", color="Source", barmode="group")
-                st.plotly_chart(fig, use_container_width=True)
-
-        with col_g2:
-            if "Fournisseur" in df_display.columns and "Taux correspondance (%)" in df_display.columns:
-                fig = px.bar(df_display, x="Fournisseur", y="Taux correspondance (%)",
-                             color="Taux correspondance (%)", color_continuous_scale="RdYlGn",
-                             title="Taux de correspondance par fournisseur")
+            # Utiliser la bonne colonne 'taux_qualifies_pct'
+            if 'taux_qualifies_pct' in df_comparaison.columns:
+                df_plot = df_comparaison.sort_values('taux_qualifies_pct')
+                fig = px.bar(df_plot, 
+                             x="taux_qualifies_pct", 
+                             y="type_logement",
+                             orientation="h", 
+                             text="taux_qualifies_pct", 
+                             color="taux_qualifies_pct",
+                             color_continuous_scale="RdYlGn",
+                             title="Taux de qualification par type")
+                fig.update_traces(texttemplate="%{text}%", textposition="outside")
                 fig.update_layout(coloraxis_showscale=False)
                 st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Données insuffisantes.")
+            else:
+                st.info("Colonne 'taux_qualifies_pct' non trouvée")
+        
+        with col_g2:
+            fig = px.bar(df_comparaison.sort_values("total_appels"), 
+                         x="total_appels", 
+                         y="type_logement",
+                         orientation="h", 
+                         text="total_appels", 
+                         color="total_appels",
+                         color_continuous_scale="Blues",
+                         title="Nombre d'appels par type")
+            fig.update_traces(textposition="outside")
+            fig.update_layout(coloraxis_showscale=False)
+            st.plotly_chart(fig, use_container_width=True)
 
     st.markdown("---")
     st.subheader("🔍 Codes postaux non correspondants")
