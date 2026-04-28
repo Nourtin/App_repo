@@ -756,19 +756,22 @@ with tab4:
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             col_m1.metric("Types de logement", len(df_comparaison))
             col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
-
-            idx_max = df_comparaison["taux_qualifies"].idxmax()
-            idx_min = df_comparaison["taux_qualifies"].idxmin()
-            col_m3.metric(
-                "🏆 Meilleur taux",
-                f"{df_comparaison.loc[idx_max, 'taux_qualifies']}%",
-                df_comparaison.loc[idx_max, "type_logement"],
-            )
-            col_m4.metric(
-                "Plus faible",
-                f"{df_comparaison.loc[idx_min, 'taux_qualifies']}%",
-                df_comparaison.loc[idx_min, "type_logement"],
-            )
+            
+            # Vérifier les colonnes disponibles et utiliser le bon nom
+            taux_col = None
+            for col in df_comparaison.columns:
+                if 'taux_qualifie' in col.lower():
+                    taux_col = col
+                    break
+            
+            if taux_col and not df_comparaison[taux_col].empty:
+                idx_max = df_comparaison[taux_col].idxmax()
+                idx_min = df_comparaison[taux_col].idxmin()
+                col_m3.metric("🏆 Meilleur taux", f"{df_comparaison.loc[idx_max, taux_col]}%", df_comparaison.loc[idx_max, 'type_logement'])
+                col_m4.metric("⚠️ Plus faible", f"{df_comparaison.loc[idx_min, taux_col]}%", df_comparaison.loc[idx_min, 'type_logement'])
+            else:
+                col_m3.metric("🏆 Meilleur taux", "—")
+                col_m4.metric("⚠️ Plus faible", "—")
 
             st.markdown("---")
             col_g1, col_g2 = st.columns(2)
