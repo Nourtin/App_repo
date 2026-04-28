@@ -70,21 +70,14 @@ def get_fournisseurs_list(df: pd.DataFrame):
         return []
     return sorted(df["list_name"].dropna().astype(str).unique().tolist())
 
-
 def _sanitize_for_display(df_in: pd.DataFrame) -> pd.DataFrame:
     """
-    Coerce every column to a type PyArrow/Streamlit can handle cleanly.
-    - object columns  → str  (handles mixed str/None/int)
-    - numeric columns → float64 then fill NaN with 0
-    Returns a copy so the original is never mutated.
+    Nettoie un DataFrame pour l'affichage Streamlit.
     """
     df_out = df_in.copy()
     for col in df_out.columns:
-        # Vérifier le type de la colonne
-        if df_out[col].dtype == 'object':
-            df_out[col] = df_out[col].astype(str).replace("nan", "")
-        elif pd.api.types.is_numeric_dtype(df_out[col]):
-            df_out[col] = pd.to_numeric(df_out[col], errors="coerce").fillna(0)
+        # Convertir toutes les colonnes en string
+        df_out[col] = df_out[col].astype(str).replace("nan", "")
     return df_out
 
 
