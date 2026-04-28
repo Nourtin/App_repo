@@ -748,173 +748,76 @@ with tab3:
 with tab4:
     st.header("🏠 Analyse des logements")
 
-    col_logement_t4 = next(
-        (c for c in ["tipo_vivienda", "piso_casa"] if c in df.columns), None
-    )
-
-    if col_logement_t4 is None:
-        st.warning("Colonne 'piso_casa' ou 'tipo_vivienda' non trouvée.")
+    if "piso_casa" not in df.columns and "tipo_vivienda" not in df.columns:
+        st.warning("Colonne 'piso_casa' ou 'tipo_vivienda' non trouvée")
     else:
+        col_logement = "tipo_vivienda" if "tipo_vivienda" in df.columns else "piso_casa"
         df_log = df.copy()
-        df_log["type_groupe"], df_log["type_detail"] = _mapper_type_logement(df_log[col_logement_t4])
-
+        df_log["type_groupe"], df_log["type_detail"] = _mapper_type_logement(df_log[col_logement])
+        
         st.subheader("📊 Vue d'ensemble par type de logement")
-        view_mode = st.radio(
-            "Mode d'affichage",
-            ["🏠 Vue regroupée", "📋 Vue détaillée (tous les types)"],
-            horizontal=True,
-        )
-        regrouper = view_mode == "🏠 Vue regroupée"
-
-        analyse_types = analyse_par_type_logement(df, regrouper=regrouper)
-        df_comparaison = comparer_types_logement(df, regrouper=regrouper)
-
-        if "error" not in analyse_types and not df_comparaison.empty:
+        
+        analyse_types = analyse_par_type_logement(df, regrouper=True)
+        
+        if "error" not in analyse_types:
             df_comparaison = comparer_types_logement(df, regrouper=True)
-            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-            col_m1.metric("Types de logement", len(df_comparaison))
-            col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
             
-            # Vérifier les colonnes disponibles et utiliser le bon nom
-            taux_col = None
-            for col in df_comparaison.columns:
-                if 'taux_qualifie' in col.lower():
-                    taux_col = col
-                    break
-            
-            if taux_col and not df_comparaison[taux_col].empty:
-                idx_max = df_comparaison[taux_col].idxmax()
-                idx_min = df_comparaison[taux_col].idxmin()
-                col_m3.metric("🏆 Meilleur taux", f"{df_comparaison.loc[idx_max, taux_col]}%", df_comparaison.loc[idx_max, 'type_logement'])
-                col_m4.metric("⚠️ Plus faible", f"{df_comparaison.loc[idx_min, taux_col]}%", df_comparaison.loc[idx_min, 'type_logement'])
-            else:
-                col_m3.metric("🏆 Meilleur taux", "—")
-                col_m4.metric("⚠️ Plus faible", "—")
-
-            st.markdown("---")
-            col_g1, col_g2 = st.columns(2)
-
-            with col_g1:
-                fig = px.bar(df_comparaison.sort_values("taux_qualifies"),
-                             x="taux_qualifies", y="type_logement", orientation="h",
-                             text="taux_qualifies", color="taux_qualifies",
-                             color_continuous_scale="RdYlGn")
-                fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                fig.update_layout(coloraxis_showscale=False)
-                st.plotly_chart(fig, use_container_width=True)
-
-            with col_g2:
-                fig = px.bar(df_comparaison.sort_values("total_appels"),
-                             x="total_appels", y="type_logement", orientation="h",
-                             text="total_appels", color="total_appels",
-                             color_continuous_scale="Blues")
-                fig.update_traces(textposition="outside")
-                fig.update_layout(coloraxis_showscale=False)
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("---")
-            st.dataframe(
-                _sanitize_for_display(df_comparaison.rename(columns={
-                    "type_logement": "Type de logement", "total_appels": "Total appels",
-                    "appels_valides": "Appels valides", "taux_valides": "Taux valides (%)",
-                    "appels_qualifies": "Appels qualifiés", "taux_qualifies": "Taux qualification (%)",
-                    "pct_rdv_leads": "RDV Leads (%)", "pct_tres_interesse": "Très intéressé (%)",
-                    "pct_interesse": "Intéressé (%)",
-                })),
-                use_container_width=True, hide_index=True,
-            )
-
-        # Drill-down
-        st.markdown("---")
-        st.subheader("🔍 Drill-down par type de logement")
-
-        col_drilldown = "type_groupe" if regrouper else "type_detail"
-        types_list = sorted(
-            t for t in df_log[col_drilldown].dropna().unique()
-            if str(t) not in ("", "nan", "None")
-        )
-
-        if types_list:
-            selected_type = st.selectbox("Choisissez un type de logement", types_list)
-
-            if regrouper and selected_type:
-                st.markdown(f"**📋 Détail des sous-types pour '{selected_type}' :**")
-                details = _get_detail_by_group(df_log, selected_type)
-                if not details.empty:
-                    st.dataframe(details, use_container_width=True, hide_index=True)
-                    fig = px.bar(details, x="Type original", y="Nombre d'appels",
-                                 text="%", color="Nombre d'appels", color_continuous_scale="Viridis")
-                    fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                    fig.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig, use_container_width=True)
-
-            if selected_type in analyse_types:
-                data = analyse_types[selected_type]
+            # TOUT LE CODE QUI UTILISE df_comparaison EST DANS CE BLOC
+            if not df_comparaison.empty:
+                # Métriques
+                col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+                col_m1.metric("Types de logement", len(df_comparaison))
+                col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
+                
+                # Trouver la bonne colonne pour le taux
+                taux_col = 'taux_qualifies_pct' if 'taux_qualifies_pct' in df_comparaison.columns else 'taux_qualifies'
+                
+                if taux_col in df_comparaison.columns:
+                    idx_max = df_comparaison[taux_col].idxmax()
+                    idx_min = df_comparaison[taux_col].idxmin()
+                    col_m3.metric("🏆 Meilleur taux", f"{df_comparaison.loc[idx_max, taux_col]}%", df_comparaison.loc[idx_max, 'type_logement'])
+                    col_m4.metric("⚠️ Plus faible", f"{df_comparaison.loc[idx_min, taux_col]}%", df_comparaison.loc[idx_min, 'type_logement'])
+                else:
+                    col_m3.metric("🏆 Meilleur taux", "—")
+                    col_m4.metric("⚠️ Plus faible", "—")
+                
                 st.markdown("---")
-                col_d1, col_d2, col_d3, col_d4 = st.columns(4)
-                col_d1.metric("Total appels", data["total_appels"])
-                col_d2.metric("Appels utiles", data["appels_utiles"])
-                col_d3.metric("Taux utiles", f"{data['taux_utiles_pct']}%")
-                col_d4.metric("Taux qualification", f"{data['taux_qualifies_pct']}%")
-
-                if data.get("duree_moyenne_sec"):
-                    st.metric("Durée moyenne", f"{data['duree_moyenne_sec']}s")
-
-                if "pct_prioritaires" in data:
-                    st.markdown("**📊 Classifications prioritaires :**")
-                    cols = st.columns(3)
-                    for i, (cat, values) in enumerate(data["pct_prioritaires"].items()):
-                        with cols[i % 3]:
-                            st.metric(cat, f"{values['pct_du_total']}%", f"{values['count']} appels")
-
-                col_r1, col_r2 = st.columns(2)
-                with col_r1:
-                    if data.get("repartition_classifications"):
-                        df_repart = pd.DataFrame([
-                            {"Classification": k, "Nombre": v}
-                            for k, v in data["repartition_classifications"].items()
-                        ])
-                        fig = px.pie(df_repart, names="Classification", values="Nombre",
-                                     color_discrete_sequence=PALETTE, hole=0.3)
-                        fig.update_traces(textinfo="percent+label")
+                col_g1, col_g2 = st.columns(2)
+                
+                with col_g1:
+                    if taux_col in df_comparaison.columns:
+                        df_plot = df_comparaison.sort_values(taux_col)
+                        fig = px.bar(df_plot, x=taux_col, y="type_logement",
+                                     orientation="h", text=taux_col, color=taux_col,
+                                     color_continuous_scale="RdYlGn")
+                        fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                        fig.update_layout(coloraxis_showscale=False)
                         st.plotly_chart(fig, use_container_width=True)
-
-                with col_r2:
-                    st.subheader("🏆 Top 3 classifications")
-                    if data.get("top_classifications"):
-                        for i, (classification, count) in enumerate(data["top_classifications"].items(), 1):
-                            pct = round(count / data["total_appels"] * 100, 1)
-                            st.markdown(f"**{i}. {classification}** → {count} appels ({pct}%)")
+                
+                with col_g2:
+                    fig = px.bar(df_comparaison.sort_values("total_appels"), x="total_appels", y="type_logement",
+                                 orientation="h", text="total_appels", color="total_appels",
+                                 color_continuous_scale="Blues")
+                    fig.update_traces(textposition="outside")
+                    fig.update_layout(coloraxis_showscale=False)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.markdown("---")
+                st.dataframe(
+                    df_comparaison.rename(columns={
+                        "type_logement": "Type de logement",
+                        "total_appels": "Total appels",
+                        "appels_valides": "Appels valides",
+                        "taux_valides_pct": "Taux valides (%)",
+                        "appels_qualifies": "Appels qualifiés",
+                        "taux_qualifies_pct": "Taux qualification (%)"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Aucune donnée de comparaison disponible")
         else:
-            st.warning("Aucun type de logement valide trouvé.")
-
-        # Vue simplifiée
-        st.markdown("---")
-        st.subheader("📊 Vue simplifiée")
-        df_tipo = appels_par_piso_casa(df)
-
-        if not df_tipo.empty:
-            col_p, col_b = st.columns(2)
-            with col_p:
-                fig = px.pie(df_tipo, names="piso_casa", values="count",
-                             color_discrete_sequence=PALETTE, hole=0.4)
-                fig.update_traces(textinfo="percent+label")
-                fig.update_layout(showlegend=False, margin=dict(t=10, b=10))
-                st.plotly_chart(fig, use_container_width=True)
-
-            with col_b:
-                fig = px.bar(df_tipo.sort_values("count"), x="count", y="piso_casa",
-                             orientation="h", text="pct", color="count", color_continuous_scale="Purples")
-                fig.update_traces(texttemplate="%{text}%", textposition="outside")
-                fig.update_layout(yaxis_title="", xaxis_title="Appels",
-                                  coloraxis_showscale=False, margin=dict(t=10))
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.dataframe(
-                df_tipo.rename(columns={"piso_casa": "Type de logement", "count": "Appels", "pct": "%"}),
-                use_container_width=True, hide_index=True,
-            )
-
+            st.info(analyse_types.get("error", "Erreur dans l'analyse"))
 # ══════════════════════════════════════════════
 # TAB 5 — AI RECOMMENDATIONS
 # ══════════════════════════════════════════════
