@@ -80,7 +80,8 @@ def _sanitize_for_display(df_in: pd.DataFrame) -> pd.DataFrame:
     """
     df_out = df_in.copy()
     for col in df_out.columns:
-        if df_out[col].dtype == object:
+        # Vérifier le type de la colonne
+        if df_out[col].dtype == 'object':
             df_out[col] = df_out[col].astype(str).replace("nan", "")
         elif pd.api.types.is_numeric_dtype(df_out[col]):
             df_out[col] = pd.to_numeric(df_out[col], errors="coerce").fillna(0)
