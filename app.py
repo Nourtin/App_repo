@@ -437,7 +437,8 @@ with tab2:
         st.markdown("---")
 
         # Analyse logements par fournisseur
-                st.markdown("---")
+                
+        st.markdown("---")
 
         # Analyse logements par fournisseur (avec regroupement)
         st.subheader("🏠 Analyse des types de logement par fournisseur")
