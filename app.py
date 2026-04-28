@@ -626,86 +626,70 @@ with tab3:
                 st.error(f"Faible fiabilité : {taux_corr}%")
         else:
             st.info("Pas assez de données pour comparer les codes postaux.")
-
     st.subheader("🏢 Fiabilité par fournisseur")
 df_fiabilite = analyse_fiabilite_par_fournisseur(df)
 
 if not df_fiabilite.empty:
-    # Nettoyer le DataFrame pour éviter les types non compatibles
-    df_fiabilite_clean = df_fiabilite.copy()
-    
-    # Convertir les colonnes problématiques
-    for col in df_fiabilite_clean.columns:
-        # Si la colonne contient des dictionnaires ou listes, les convertir en string
-        if df_fiabilite_clean[col].apply(lambda x: isinstance(x, (dict, list))).any():
-            df_fiabilite_clean[col] = df_fiabilite_clean[col].astype(str)
-    
     # Renommer les colonnes pour l'affichage
-    col_rename = {}
-    for col in df_fiabilite_clean.columns:
-        if 'fournisseur' in col.lower():
-            col_rename[col] = "Fournisseur"
-        elif 'total_appels' in col.lower():
-            col_rename[col] = "Total appels"
-        elif 'taux_remplissage_client' in col.lower():
-            col_rename[col] = "Taux client (%)"
-        elif 'taux_remplissage_fournisseur' in col.lower():
-            col_rename[col] = "Taux fournisseur (%)"
-        elif 'nb_comparaisons' in col.lower():
-            col_rename[col] = "Nb comparaisons"
-        elif 'taux_correspondance' in col.lower():
-            col_rename[col] = "Taux correspondance (%)"
+    df_display = df_fiabilite.copy()
     
-    df_fiabilite_clean = df_fiabilite_clean.rename(columns=col_rename)
+    # Renommer list_name en Fournisseur
+    if 'list_name' in df_display.columns:
+        df_display = df_display.rename(columns={'list_name': 'Fournisseur'})
+    
+    # Renommer les autres colonnes
+    rename_map = {
+        'total_appels': 'Total appels',
+        'taux_remplissage_client_pct': 'Taux client (%)',
+        'taux_remplissage_fournisseur_pct': 'Taux fournisseur (%)',
+        'nb_comparaisons': 'Nb comparaisons',
+        'taux_correspondance_pct': 'Taux correspondance (%)'
+    }
+    
+    for old, new in rename_map.items():
+        if old in df_display.columns:
+            df_display = df_display.rename(columns={old: new})
+    
+    # S'assurer qu'il n'y a pas de doublons de colonnes
+    df_display = df_display.loc[:, ~df_display.columns.duplicated()]
     
     # Afficher le tableau
-    st.dataframe(df_fiabilite_clean, use_container_width=True, hide_index=True)
-
-    # Graphiques
-    col_g1, col_g2 = st.columns(2)
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
     
-    with col_g1:
-        # Graphique des taux de remplissage
-        if 'Fournisseur' in df_fiabilite_clean.columns:
-            df_plot = pd.DataFrame()
-            df_plot['Fournisseur'] = df_fiabilite_clean['Fournisseur']
-            df_plot['Taux client'] = pd.to_numeric(df_fiabilite_clean.get('Taux client (%)', 0), errors='coerce').fillna(0)
-            df_plot['Taux fournisseur'] = pd.to_numeric(df_fiabilite_clean.get('Taux fournisseur (%)', 0), errors='coerce').fillna(0)
-            
-            df_melt = df_plot.melt(id_vars=['Fournisseur'], var_name='Source', value_name='Taux (%)')
-            fig = px.bar(df_melt, x='Fournisseur', y='Taux (%)', color='Source', barmode='group')
-            st.plotly_chart(fig, use_container_width=True)
+    # Graphique des taux de correspondance
+    if 'Fournisseur' in df_display.columns and 'Taux correspondance (%)' in df_display.columns:
+        fig = px.bar(
+            df_display,
+            x='Fournisseur',
+            y='Taux correspondance (%)',
+            color='Taux correspondance (%)',
+            color_continuous_scale='RdYlGn',
+            title="Taux de correspondance des codes postaux par fournisseur"
+        )
+        fig.update_layout(coloraxis_showscale=False)
+        st.plotly_chart(fig, use_container_width=True)
     
-    with col_g2:
-        # Graphique du taux de correspondance
-        if 'Fournisseur' in df_fiabilite_clean.columns and 'Taux correspondance (%)' in df_fiabilite_clean.columns:
-            df_corr = df_fiabilite_clean[['Fournisseur', 'Taux correspondance (%)']].copy()
-            df_corr['Taux correspondance (%)'] = pd.to_numeric(df_corr['Taux correspondance (%)'], errors='coerce').fillna(0)
-            
-            fig = px.bar(
-                df_corr,
-                x='Fournisseur',
-                y='Taux correspondance (%)',
-                color='Taux correspondance (%)',
-                color_continuous_scale='RdYlGn',
-                title="Taux de correspondance par fournisseur"
-            )
-            fig.update_layout(coloraxis_showscale=False)
-            st.plotly_chart(fig, use_container_width=True)
+    # Graphique des taux de remplissage
+    if 'Fournisseur' in df_display.columns:
+        # Préparer les données pour le graphique empilé
+        plot_data = []
+        for _, row in df_display.iterrows():
+            plot_data.append({'Fournisseur': row['Fournisseur'], 'Source': 'Client', 'Taux (%)': row.get('Taux client (%)', 0)})
+            plot_data.append({'Fournisseur': row['Fournisseur'], 'Source': 'Fournisseur', 'Taux (%)': row.get('Taux fournisseur (%)', 0)})
+        
+        df_plot = pd.DataFrame(plot_data)
+        fig2 = px.bar(
+            df_plot,
+            x='Fournisseur',
+            y='Taux (%)',
+            color='Source',
+            barmode='group',
+            title="Taux de remplissage des codes postaux"
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+        
 else:
     st.info("Données insuffisantes pour analyser la fiabilité par fournisseur")
-    st.subheader("🔍 Codes postaux non correspondants")
-    df_non_corr = codes_postaux_non_correspondants(df)
-
-    if not df_non_corr.empty:
-        cols_afficher = ["list_name", "code_postal", "codigo_postal", "code_postal_clean", "codigo_postal_clean"]
-        cols_disponibles = [c for c in cols_afficher if c in df_non_corr.columns]
-        st.dataframe(df_non_corr[cols_disponibles].head(100), use_container_width=True, hide_index=True)
-        csv = df_non_corr[cols_disponibles].to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Exporter les non-correspondances", data=csv,
-                           file_name="non_correspondances_codes_postaux.csv", mime="text/csv")
-    else:
-        st.success("Tous les codes postaux disponibles correspondent !")
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS (avec regroupement et drill-down)
 # ══════════════════════════════════════════════
