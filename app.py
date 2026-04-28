@@ -770,6 +770,7 @@ with tab4:
         df_comparaison = comparer_types_logement(df, regrouper=regrouper)
 
         if "error" not in analyse_types and not df_comparaison.empty:
+            df_comparaison = comparer_types_logement(df, regrouper=True)
             col_m1, col_m2, col_m3, col_m4 = st.columns(4)
             col_m1.metric("Types de logement", len(df_comparaison))
             col_m2.metric("Total appels", f"{df_comparaison['total_appels'].sum():,}")
