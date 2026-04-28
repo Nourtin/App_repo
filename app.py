@@ -32,6 +32,8 @@ from analyse import (
     appels_par_piso_casa,
     duree_par_classification,
     _mapper_type_logement,
+    _est_utile,
+    _est_qualifie
 )
 from ats_analysis import render_ats_tab
 
