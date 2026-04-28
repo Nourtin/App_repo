@@ -19,7 +19,7 @@ from analyse import (
     taux_remplissage_code_postal, comparer_codes_postaux, analyse_fiabilite_par_fournisseur,
     codes_postaux_non_correspondants, analyse_par_type_logement,
     comparer_types_logement, classification_detaillee_par_type, appels_par_piso_casa,
-    duree_par_classification
+    duree_par_classification, _mapper_type_logement  # Ajouter cette ligne
 )
 from ats_analysis import render_ats_tab
 
@@ -437,26 +437,190 @@ with tab2:
         st.markdown("---")
 
         # Analyse logements par fournisseur
+                st.markdown("---")
+
+        # Analyse logements par fournisseur (avec regroupement)
         st.subheader("🏠 Analyse des types de logement par fournisseur")
 
-        if "tipo_vivienda" in df.columns:
-            fournisseurs_list = sorted(df["list_name"].dropna().unique())
-            selected_fournisseur = st.selectbox(
-                "Choisissez un fournisseur pour voir le détail des logements",
-                options=["Tous les fournisseurs"] + fournisseurs_list,
-                key="logement_fournisseur_select"
-            )
-
-            df_logement_filter = df if selected_fournisseur == "Tous les fournisseurs" else df[df["list_name"] == selected_fournisseur]
-            df_logement_clean = df_logement_filter.copy()
-            df_logement_clean["tipo_vivienda"] = df_logement_clean["tipo_vivienda"].astype(str).str.strip()
-            df_logement_clean = df_logement_clean[~df_logement_clean["tipo_vivienda"].isin(["", "nan", "None"])]
-
-            if not df_logement_clean.empty:
+        if "tipo_vivienda" in df.columns or "piso_casa" in df.columns:
+            # Déterminer la colonne de logement
+            col_logement = "tipo_vivienda" if "tipo_vivienda" in df.columns else "piso_casa"
+            
+            # Option de regroupement
+            col_reg1, col_reg2 = st.columns([1, 3])
+            with col_reg1:
+                use_grouping = st.checkbox(
+                    "📦 Regrouper les types similaires", 
+                    value=True, 
+                    key="grouping_checkbox_tab2",
+                    help="Regroupe automatiquement les types (PISO, CASA, etc.)"
+                )
+            
+            # Appliquer le regroupement
+            df_log_temp = df.copy()
+            if use_grouping:
+                from analyse import _mapper_type_logement
+                df_log_temp["type_groupe"], df_log_temp["type_detail"] = _mapper_type_logement(df_log_temp[col_logement])
+                col_analyse = "type_groupe"
+                detail_available = True
+            else:
+                df_log_temp["type_groupe"] = df_log_temp[col_logement].astype(str).str.strip()
+                col_analyse = "type_groupe"
+                detail_available = False
+            
+            # Nettoyer
+            df_log_temp = df_log_temp[df_log_temp[col_analyse].notna()]
+            df_log_temp = df_log_temp[df_log_temp[col_analyse] != ""]
+            df_log_temp = df_log_temp[df_log_temp[col_analyse] != "nan"]
+            
+            if not df_log_temp.empty:
+                # Sélecteur de fournisseur
+                fournisseurs_list = sorted(df["list_name"].dropna().unique())
+                selected_fournisseur = st.selectbox(
+                    "Choisissez un fournisseur pour voir le détail des logements",
+                    options=["Tous les fournisseurs"] + fournisseurs_list,
+                    key="logement_fournisseur_select_tab2"
+                )
+                
+                # Filtrer
+                if selected_fournisseur == "Tous les fournisseurs":
+                    df_filtered = df_log_temp
+                else:
+                    df_filtered = df_log_temp[df_log_temp["list_name"] == selected_fournisseur]
+                
+                # Métriques rapides
                 col_log1, col_log2, col_log3 = st.columns(3)
-                col_log1.metric("Appels avec type logement", f"{len(df_logement_clean):,}")
-                col_log2.metric("Types différents", df_logement_clean["tipo_vivienda"].nunique())
-                col_log3.metric("Type le plus fréquent", df_logement_clean["tipo_vivienda"].mode().iloc[0])
+                col_log1.metric("Appels avec type logement", f"{len(df_filtered):,}")
+                col_log2.metric("Types différents", df_filtered[col_analyse].nunique())
+                col_log3.metric("Type le plus fréquent", df_filtered[col_analyse].mode().iloc[0] if not df_filtered.empty else "N/A")
+                
+                st.markdown("---")
+                col_chart1, col_chart2 = st.columns(2)
+                
+                with col_chart1:
+                    st.subheader("🥧 Répartition par type")
+                    counts = df_filtered[col_analyse].value_counts()
+                    fig_pie = px.pie(
+                        values=counts.values, 
+                        names=counts.index,
+                        title="Répartition des logements",
+                        color_discrete_sequence=PALETTE, 
+                        hole=0.3
+                    )
+                    fig_pie.update_traces(textinfo="percent+label")
+                    st.plotly_chart(fig_pie, use_container_width=True)
+                
+                with col_chart2:
+                    st.subheader("📊 Top types")
+                    df_top = df_filtered[col_analyse].value_counts().head(10).reset_index()
+                    df_top.columns = ["Type de logement", "Nombre d'appels"]
+                    fig_bar = px.bar(
+                        df_top,
+                        x="Nombre d'appels",
+                        y="Type de logement",
+                        orientation="h",
+                        text="Nombre d'appels",
+                        color="Nombre d'appels",
+                        color_continuous_scale="Blues"
+                    )
+                    fig_bar.update_traces(textposition="outside")
+                    fig_bar.update_layout(coloraxis_showscale=False)
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                
+                # Drill-down si regroupement actif
+                if use_grouping and detail_available:
+                    st.markdown("---")
+                    st.subheader("🔍 Drill-down par type")
+                    
+                    # Sélection du groupe pour voir les détails
+                    groupes_disponibles = sorted(df_filtered[col_analyse].unique())
+                    selected_groupe = st.selectbox(
+                        "Choisissez un groupe pour voir les sous-types",
+                        groupes_disponibles,
+                        key="drilldown_select_tab2"
+                    )
+                    
+                    if selected_groupe:
+                        details = df_filtered[df_filtered[col_analyse] == selected_groupe]["type_detail"].value_counts().reset_index()
+                        details.columns = ["Type original", "Nombre d'appels"]
+                        details["%"] = (details["Nombre d'appels"] / details["Nombre d'appels"].sum() * 100).round(1)
+                        
+                        st.write(f"**Sous-types pour '{selected_groupe}':**")
+                        st.dataframe(details, use_container_width=True, hide_index=True)
+                        
+                        # Graphique des sous-types
+                        fig = px.bar(
+                            details,
+                            x="Type original",
+                            y="Nombre d'appels",
+                            text="%",
+                            color="Nombre d'appels",
+                            color_continuous_scale="Viridis"
+                        )
+                        fig.update_traces(texttemplate="%{text}%", textposition="outside")
+                        fig.update_layout(xaxis_tickangle=-45)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # Classification par type de logement (si disponible)
+                if "Classification" in df.columns:
+                    st.markdown("---")
+                    st.subheader("🎯 Classification des appels par type de logement")
+                    
+                    # Filtrer classifications valides
+                    df_classif = df_filtered[df_filtered["Classification"].notna()]
+                    df_classif = df_classif[~df_classif["Classification"].astype(str).str.lower().isin(["non trouvé", "non trouve", ""])]
+                    
+                    if not df_classif.empty:
+                        # Top 5 types pour la lisibilité
+                        top_types = df_classif[col_analyse].value_counts().head(5).index
+                        df_classif_top = df_classif[df_classif[col_analyse].isin(top_types)]
+                        
+                        # Tableau croisé
+                        cross_classif = pd.crosstab(df_classif_top[col_analyse], df_classif_top["Classification"])
+                        
+                        # Graphique
+                        fig_classif = px.bar(
+                            cross_classif,
+                            title="Classifications par type de logement (Top 5)",
+                            labels={"value": "Nombre d'appels", col_analyse: "Type de logement"},
+                            barmode="group",
+                            color_discrete_sequence=PALETTE
+                        )
+                        st.plotly_chart(fig_classif, use_container_width=True)
+                        
+                        with st.expander("📑 Voir le tableau détaillé"):
+                            st.dataframe(cross_classif, use_container_width=True)
+                
+                # Tableau récapitulatif par fournisseur (si tous les fournisseurs)
+                if selected_fournisseur == "Tous les fournisseurs":
+                    st.markdown("---")
+                    st.subheader("📋 Récapitulatif par fournisseur")
+                    
+                    # Créer un tableau pivot des pourcentages
+                    df_pivot = pd.crosstab(
+                        df_filtered["list_name"], 
+                        df_filtered[col_analyse],
+                        normalize="index"
+                    ) * 100
+                    
+                    st.dataframe(
+                        df_pivot.round(1).style.format("{:.1f}%"),
+                        use_container_width=True,
+                        height=400
+                    )
+                    
+                    # Export
+                    csv = df_pivot.to_csv().encode('utf-8')
+                    st.download_button(
+                        label="📥 Exporter les données",
+                        data=csv,
+                        file_name="logement_par_fournisseur.csv",
+                        mime="text/csv",
+                    )
+            else:
+                st.info("Aucune donnée sur les types de logement pour ce fournisseur")
+        else:
+            st.info("Colonne 'tipo_vivienda' ou 'piso_casa' non trouvée")
 
                 st.markdown("---")
                 col_chart1, col_chart2 = st.columns(2)
