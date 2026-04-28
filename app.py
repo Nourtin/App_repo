@@ -573,17 +573,23 @@ with tab2:
             if df_log_temp.empty:
                 st.info("Aucune donnée sur les types de logement.")
             else:
-                fournisseurs_list = sorted(df["list_name"].dropna().unique()) if "list_name" in df.columns else []
+                # Récupérer la liste des fournisseurs sans erreur de type
+                if "list_name" in df.columns:
+                    fournisseurs_list = sorted(df["list_name"].dropna().astype(str).unique().tolist())
+                else:
+                    fournisseurs_list = []
+                
                 selected_fournisseur = st.selectbox(
                     "Choisissez un fournisseur",
                     ["Tous les fournisseurs"] + fournisseurs_list,
                     key="logement_fournisseur_select_tab2",
                 )
+                
+                df_filtered = df_log_temp 
+                if selected_fournisseur == "Tous les fournisseurs"
+                else df_log_temp[df_log_temp["list_name"].astype(str) == selected_fournisseur]
 
-                df_filtered = (
-                    df_log_temp if selected_fournisseur == "Tous les fournisseurs"
-                    else df_log_temp[df_log_temp["list_name"] == selected_fournisseur]
-                )
+               
 
                 # Métriques
                 col_log1, col_log2, col_log3 = st.columns(3)
