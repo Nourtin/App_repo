@@ -254,10 +254,8 @@ with st.sidebar:
         df_raw = st.session_state.df_raw
 
         if "list_name" in df_raw.columns:
-            # Convertir toutes les valeurs en string avant de trier
-            fourn_list = df_raw["list_name"].dropna().astype(str).unique().tolist()
-            fourn_list.sort()  # Trier après conversion en string
-            fournisseurs = ["Tous"] + fourn_list
+            
+            fournisseurs = ["Tous"] + list(df_raw["list_name"].dropna().astype(str).unique())
             fourn_sel = st.selectbox("Fournisseur (list_name)", fournisseurs)
 
         if "Timestamp" in df_raw.columns:
