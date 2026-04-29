@@ -1461,8 +1461,10 @@ def render_ats_tab(api_key_input: str = None):
         server1 = [f for f in server1 if "latest" not in f]
 
         server2 = glob.glob(os.path.join(data_dir, "server2_report_*.csv"))
+        server2 = sorted([f for f in server2 if "latest" not in f])[-30:] 
         server2 = [f for f in server2 if "latest" not in f]
         server3 = glob.glob(os.path.join(data_dir, "server3_report_*.csv"))
+        server3 = sorted([f for f in server3 if "latest" not in f])[-30:] 
         server3 = [f for f in server3 if "latest" not in f]
 
         return sorted(old), sorted(server1), sorted(server2), sorted(server3)
@@ -1616,10 +1618,9 @@ def render_ats_tab(api_key_input: str = None):
     if server2_files:
         noms_s2 = [os.path.basename(f) for f in server2_files]
         fichiers_sel_s2 = st.multiselect(
-            "Fichiers disponibles Serveur 2 (repo GitHub)",
+            "Fichiers disponibles Serveur 2",
             options=noms_s2,
-            default=noms_s2,
-            placeholder="Choisissez un ou plusieurs fichiers...",
+            default=[noms_s2[-1]] if noms_s2 else [],  # ← seulement le dernier fichier
             key="s2_multiselect",
         )
         selected_s2_paths = [f for f in server2_files if os.path.basename(f) in fichiers_sel_s2]
@@ -1656,10 +1657,9 @@ def render_ats_tab(api_key_input: str = None):
         noms_s3 = [os.path.basename(f) for f in server3_files]
     
         fichiers_sel_s3 = st.multiselect(
-            "Fichiers disponibles Serveur 3 (repo GitHub)",
+            "Fichiers disponibles Serveur 3",
             options=noms_s3,
-            default=noms_s3,
-            placeholder="Choisissez un ou plusieurs fichiers...",
+            default=[noms_s3[-1]] if noms_s3 else [],  # ← seulement le dernier
             key="s3_multiselect",
         )
     
