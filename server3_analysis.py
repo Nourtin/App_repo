@@ -146,7 +146,7 @@ def render_server3_section(server3_files: list):
         success_override = []
         for i, s in enumerate(all_statuses):
             default = any(x in s.upper() for x in STATUS_SUCCESS)
-            if cols[i % 4].checkbox(s, value=default, key=f"s2_status_{s}"):
+            if cols[i % 4].checkbox(s, value=default, key=f"s3_status_{s}"):
                 success_override.append(s)
         if success_override:
             df["categorie_statut"] = df["status"].apply(
@@ -337,13 +337,13 @@ def render_server3_section(server3_files: list):
         col1, col2, col3 = st.columns(3)
         with col1:
             agents = ["Tous"] + sorted(df["user"].dropna().unique().tolist()) if "user" in df.columns else ["Tous"]
-            agent_filter = st.selectbox("Agent", agents, key="s2_agent_filter")
+            agent_filter = st.selectbox("Agent", agents, key="s3_agent_filter") 
         with col2:
             statuts = ["Tous"] + sorted(df["status"].dropna().unique().tolist()) if "status" in df.columns else ["Tous"]
-            status_filter = st.selectbox("Statut", statuts, key="s2_status_filter")
+            status_filter = st.selectbox("Statut", statuts, key="s3_status_filter") 
         with col3:
             cats = ["Toutes"] + sorted(df["categorie_statut"].dropna().unique().tolist()) if "categorie_statut" in df.columns else ["Toutes"]
-            cat_filter = st.selectbox("Catégorie", cats, key="s2_cat_filter")
+            cat_filter = st.selectbox("Catégorie", cats, key="s3_cat_filter") 
 
         df_filtered = df.copy()
         if agent_filter != "Tous" and "user" in df.columns:
