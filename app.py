@@ -40,7 +40,10 @@ from analyse import (
     _mapper_type_logement,
     _est_utile,
     _est_qualifie,
-    get_detail_by_group
+    get_detail_by_group,
+    performance_serveur_par_fournisseur,
+    repartition_classification_par_serveur,
+    analyser_serveur_origine
     
 )
 from ats_analysis import render_ats_tab
@@ -316,14 +319,15 @@ if df.empty:
 # ONGLETS
 # ─────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4, tab5, tab_wc, tab_ats = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab_wc,tab5, tab_ats = st.tabs([
     "📊 Analyse globale",
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
     "🏠 Logements",
     "🤖 AI Recommendations",
     "☁️ Nuage de mots",
-    "📋 Analyse des ATS par IA",
+    "📞 Origine des appels",
+    "📋 Analyse des ATS par IA"
 ])
 
 # ══════════════════════════════════════════════
@@ -1199,3 +1203,215 @@ with tab_wc:
                     file_name="wordcloud_frequences.csv",
                     mime="text/csv",
                 )
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+# TAB 6 — ANALYSE PAR SERVEUR D'ORIGINE (PHONE)
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+with tab6:
+    st.header("📞 Analyse par serveur d'origine des appels")
+    st.markdown("---")
+    
+    # Vérifier si la colonne phone existe
+    if "phone" not in df.columns:
+        st.warning("⚠️ Colonne 'phone' non trouvée dans les données")
+        st.info("Cette analyse nécessite une colonne 'phone' indiquant le serveur d'origine des appels")
+        st.stop()
+    
+    # Analyse principale
+    df_serveur = analyser_serveur_origine(df)
+    
+    if df_serveur.empty:
+        st.info("Aucune donnée valide dans la colonne 'phone'")
+        st.stop()
+    
+    # ========== KPIs globaux ==========
+    st.subheader("📊 Vue d'ensemble")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Serveurs détectés", len(df_serveur))
+    with col2:
+        total_appels = df_serveur["appels"].sum()
+        st.metric("Total appels analysés", f"{total_appels:,}")
+    with col3:
+        taux_moyen_classif = df_serveur["taux_classification"].mean()
+        st.metric("Taux classification moyen", f"{taux_moyen_classif:.1f}%")
+    with col4:
+        taux_moyen_qualif = df_serveur["taux_qualification"].mean()
+        st.metric("Taux qualification moyen", f"{taux_moyen_qualif:.1f}%")
+    
+    st.markdown("---")
+    
+    # ========== Tableau récapitulatif ==========
+    st.subheader("📋 Performance par serveur")
+    
+    st.dataframe(
+        df_serveur.rename(columns={
+            "serveur": "Serveur d'origine",
+            "appels": "Total appels",
+            "part_du_total": "Part du total (%)",
+            "taux_classification": "Taux classification (%)",
+            "taux_qualification": "Taux qualification (%)",
+            "duree_moyenne": "Durée moyenne (s)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    st.markdown("---")
+    
+    # ========== Graphiques ==========
+    col_g1, col_g2 = st.columns(2)
+    
+    with col_g1:
+        st.subheader("📊 Volume d'appels par serveur")
+        fig = px.bar(
+            df_serveur.sort_values("appels", ascending=True),
+            x="appels",
+            y="serveur",
+            orientation="h",
+            text="appels",
+            title="Nombre d'appels par serveur",
+            color="appels",
+            color_continuous_scale="Blues"
+        )
+        fig.update_traces(textposition="outside")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col_g2:
+        st.subheader("🎯 Taux de qualification par serveur")
+        fig = px.bar(
+            df_serveur.sort_values("taux_qualification", ascending=True),
+            x="taux_qualification",
+            y="serveur",
+            orientation="h",
+            text="taux_qualification",
+            title="Taux de qualification par serveur",
+            color="taux_qualification",
+            color_continuous_scale="Greens"
+        )
+        fig.update_traces(texttemplate="%{text}%", textposition="outside")
+        st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # ========== Comparaison classification vs qualification ==========
+    st.subheader("📈 Comparaison Classification vs Qualification")
+    
+    df_compare = df_serveur.melt(
+        id_vars=["serveur"],
+        value_vars=["taux_classification", "taux_qualification"],
+        var_name="indicateur",
+        value_name="taux"
+    )
+    df_compare["indicateur"] = df_compare["indicateur"].map({
+        "taux_classification": "Classification",
+        "taux_qualification": "Qualification"
+    })
+    
+    fig = px.bar(
+        df_compare,
+        x="serveur",
+        y="taux",
+        color="indicateur",
+        barmode="group",
+        title="Comparaison Classification vs Qualification par serveur",
+        labels={"serveur": "Serveur", "taux": "Taux (%)", "indicateur": "Indicateur"},
+        color_discrete_sequence=[PALETTE[0], PALETTE[1]]
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    st.markdown("---")
+    
+    # ========== Répartition des classifications par serveur ==========
+    st.subheader("📋 Répartition des classifications par serveur")
+    
+    df_classif_serveur = repartition_classification_par_serveur(df)
+    
+    if not df_classif_serveur.empty:
+        # Graphique en barres empilées
+        df_plot = df_classif_serveur.drop(columns=["total"]).reset_index()
+        df_plot = df_plot.melt(
+            id_vars=["phone"],
+            var_name="Classification",
+            value_name="nombre"
+        )
+        df_plot = df_plot[df_plot["nombre"] > 0]
+        
+        fig = px.bar(
+            df_plot,
+            x="phone",
+            y="nombre",
+            color="Classification",
+            title="Répartition des classifications par serveur",
+            labels={"phone": "Serveur", "nombre": "Nombre d'appels"},
+            barmode="stack",
+            color_discrete_sequence=PALETTE
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Tableau
+        with st.expander("📑 Voir le tableau détaillé"):
+            st.dataframe(df_classif_serveur, use_container_width=True)
+    else:
+        st.info("Aucune donnée de classification valide par serveur")
+    
+    st.markdown("---")
+    
+    # ========== Analyse croisée: Serveur × Fournisseur ==========
+    st.subheader("🔄 Analyse croisée: Serveur × Fournisseur")
+    
+    df_croise = performance_serveur_par_fournisseur(df)
+    
+    if not df_croise.empty:
+        # Heatmap
+        fig = px.imshow(
+            df_croise.drop(columns=["total_appels"]),
+            labels=dict(x="Fournisseur", y="Serveur", color="Nombre d'appels"),
+            title="Matrice Serveur × Fournisseur",
+            color_continuous_scale="Blues",
+            text_auto=True
+        )
+        fig.update_layout(height=400)
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Tableau
+        with st.expander("📑 Voir le tableau détaillé"):
+            st.dataframe(df_croise, use_container_width=True)
+    else:
+        st.info("Données insuffisantes pour l'analyse croisée")
+    
+    st.markdown("---")
+    
+    # ========== Recommandations ==========
+    st.subheader("💡 Recommandations")
+    
+    # Identifier les serveurs problématiques
+    mauvais_serveurs = df_serveur[df_serveur["taux_qualification"] < 30]
+    bons_serveurs = df_serveur[df_serveur["taux_qualification"] > 60]
+    
+    if not mauvais_serveurs.empty:
+        st.warning("⚠️ **Serveurs à améliorer**")
+        for _, row in mauvais_serveurs.iterrows():
+            st.markdown(f"- **{row['serveur']}** : Taux qualification {row['taux_qualification']}% ({row['appels']} appels)")
+            st.markdown(f"  → Action: Analyser la qualité des connexions et former les équipes")
+    
+    if not bons_serveurs.empty:
+        st.success("✅ **Serveurs performants**")
+        for _, row in bons_serveurs.iterrows():
+            st.markdown(f"- **{row['serveur']}** : Taux qualification {row['taux_qualification']}%")
+            st.markdown(f"  → Action: Étudier les bonnes pratiques et les reproduire")
+    
+    # Export
+    st.markdown("---")
+    col_exp1, col_exp2 = st.columns(2)
+    
+    with col_exp1:
+        csv_serveur = df_serveur.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Exporter les données serveurs (CSV)",
+            data=csv_serveur,
+            file_name="analyse_serveurs.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
