@@ -319,7 +319,7 @@ if df.empty:
 # ONGLETS
 # ─────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4, tab5, tab_wc,tab5, tab_ats = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab_wc,tab6, tab_ats = st.tabs([
     "📊 Analyse globale",
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
