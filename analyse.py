@@ -7,9 +7,6 @@ from typing import Dict, List, Tuple, Optional
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
-# HELPERS
-# ─────────────────────────────────────────────
 
 def _sanitize_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """Nettoie un DataFrame pour l'affichage Streamlit (convertit les types non compatibles)"""
@@ -1458,3 +1455,124 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
 
     df_resultat = pd.DataFrame(resultats)
     return df_resultat
+    # ─────────────────────────────────────────────
+# 7. ANALYSE PAR SERVEUR D'ORIGINE (PHONE)
+# ─────────────────────────────────────────────
+
+def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Analyse la répartition des appels par serveur d'origine (phone)
+    Retourne: nombre d'appels, taux classification, taux qualification par serveur
+    """
+    if "phone" not in df.columns:
+        return pd.DataFrame()
+    
+    # Nettoyer les données
+    df_clean = df.copy()
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean = df_clean[df_clean["phone"].notna()]
+    df_clean = df_clean[df_clean["phone"] != ""]
+    df_clean = df_clean[df_clean["phone"] != "nan"]
+    
+    if df_clean.empty:
+        return pd.DataFrame()
+    
+    resultats = []
+    
+    for serveur in df_clean["phone"].unique():
+        df_serv = df_clean[df_clean["phone"] == serveur]
+        total = len(df_serv)
+        
+        # Taux classification (appels utiles)
+        taux_classif = 0
+        if "Classification" in df_serv.columns:
+            non_utiles = ["", "nan", "none", "non trouvé", "non trouve"]
+            utile_mask = ~df_serv["Classification"].astype(str).str.lower().str.strip().isin(non_utiles)
+            taux_classif = round(utile_mask.sum() / total * 100, 1) if total > 0 else 0
+        
+        # Taux qualification
+        taux_qualif = 0
+        if "Classification" in df_serv.columns:
+            classifications_qualif = ["PEU INTERESSE", "INTERESSE", "TRES INTERESSE", "EDIFICIOS", "RDV LEADS", "WHATSAP"]
+            qualif_mask = df_serv["Classification"].astype(str).str.upper().str.strip().isin([c.upper() for c in classifications_qualif])
+            taux_qualif = round(qualif_mask.sum() / total * 100, 1) if total > 0 else 0
+        
+        # Durée moyenne
+        duree_moy = df_serv["Duration_seconds"].mean() if "Duration_seconds" in df_serv.columns else 0
+        
+        resultats.append({
+            "serveur": serveur,
+            "appels": total,
+            "part_du_total": round(total / len(df_clean) * 100, 1),
+            "taux_classification": taux_classif,
+            "taux_qualification": taux_qualif,
+            "duree_moyenne": round(duree_moy, 1) if duree_moy else 0
+        })
+    
+    df_resultat = pd.DataFrame(resultats)
+    df_resultat = df_resultat.sort_values("appels", ascending=False).reset_index(drop=True)
+    
+    return df_resultat
+
+
+def repartition_classification_par_serveur(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Répartition des classifications par serveur d'origine
+    """
+    if "phone" not in df.columns or "Classification" not in df.columns:
+        return pd.DataFrame()
+    
+    # Nettoyer
+    df_clean = df.copy()
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean = df_clean[df_clean["phone"].notna()]
+    df_clean = df_clean[df_clean["phone"] != ""]
+    df_clean = df_clean[df_clean["phone"] != "nan"]
+    
+    # Exclure les classifications non utiles
+    non_utiles = ["", "nan", "none", "non trouvé", "non trouve"]
+    utile_mask = ~df_clean["Classification"].astype(str).str.lower().str.strip().isin(non_utiles)
+    df_clean = df_clean[utile_mask]
+    
+    if df_clean.empty:
+        return pd.DataFrame()
+    
+    # Tableau croisé
+    cross = pd.crosstab(df_clean["phone"], df_clean["Classification"])
+    
+    # Ajouter le total
+    cross["total"] = cross.sum(axis=1)
+    
+    # Trier par total
+    cross = cross.sort_values("total", ascending=False)
+    
+    return cross
+
+
+def performance_serveur_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Analyse croisée: serveur d'origine × fournisseur
+    """
+    if "phone" not in df.columns or "list_name" not in df.columns:
+        return pd.DataFrame()
+    
+    # Nettoyer
+    df_clean = df.copy()
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean = df_clean[df_clean["phone"].notna()]
+    df_clean = df_clean[df_clean["phone"] != ""]
+    df_clean = df_clean[df_clean["phone"] != "nan"]
+    
+    if df_clean.empty:
+        return pd.DataFrame()
+    
+    # Tableau croisé
+    cross = pd.crosstab(df_clean["phone"], df_clean["list_name"])
+    
+    # Ajouter le total par serveur
+    cross["total_appels"] = cross.sum(axis=1)
+    
+    # Trier
+    cross = cross.sort_values("total_appels", ascending=False)
+    
+    return cross
