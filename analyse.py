@@ -1467,15 +1467,12 @@ def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
     if "phone" not in df.columns:
         return pd.DataFrame()
     
-    # Nettoyer les données
+    # Ne PAS filtrer les valeurs vides - on garde toutes les lignes
     df_clean = df.copy()
-    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
-    df_clean = df_clean[df_clean["phone"].notna()]
-    df_clean = df_clean[df_clean["phone"] != ""]
-    df_clean = df_clean[df_clean["phone"] != "nan"]
     
-    if df_clean.empty:
-        return pd.DataFrame()
+    # Convertir en string et remplacer les valeurs vides par "Non défini"
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean["phone"] = df_clean["phone"].replace(["", "nan", "None", "none"], "Non défini")
     
     resultats = []
     
