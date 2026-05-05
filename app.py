@@ -731,17 +731,10 @@ with tab3:
     with sub_tab_cor1:
         st.subheader("Codes postaux correspondants")
         
-        # Utiliser comparer_codes_postaux pour obtenir les correspondances
         df_comp, stats = comparer_codes_postaux(df)
         
-        if df_comp is not None and not df_comp.empty:
-            # df_comp contient les données avec les colonnes cp_client_clean et cp_fourn_clean
-            # Filtrer les correspondances
-            if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
-                df_correspondants = df_comp[df_comp["cp_client_clean"] == df_comp["cp_fourn_clean"]].copy()
-            else:
-                # Fallback: utiliser les colonnes originales
-                df_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() == df_comp["codigo_postal"].astype(str).str.strip()].copy()
+        if df_comp is not None and not df_comp.empty and "correspond" in df_comp.columns:
+            df_correspondants = df_comp[df_comp["correspond"] == True].copy()
             
             if not df_correspondants.empty:
                 cols_afficher = ["list_name", "code_postal", "codigo_postal"]
@@ -769,16 +762,10 @@ with tab3:
     with sub_tab_cor2:
         st.subheader("Codes postaux non correspondants")
         
-        # Utiliser comparer_codes_postaux pour obtenir les non-correspondances
         df_comp, stats = comparer_codes_postaux(df)
         
-        if df_comp is not None and not df_comp.empty:
-            # Filtrer les non-correspondances
-            if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
-                df_non_correspondants = df_comp[df_comp["cp_client_clean"] != df_comp["cp_fourn_clean"]].copy()
-            else:
-                # Fallback: utiliser les colonnes originales
-                df_non_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() != df_comp["codigo_postal"].astype(str).str.strip()].copy()
+        if df_comp is not None and not df_comp.empty and "correspond" in df_comp.columns:
+            df_non_correspondants = df_comp[df_comp["correspond"] == False].copy()
             
             if not df_non_correspondants.empty:
                 cols_afficher = ["list_name", "code_postal", "codigo_postal"]
@@ -807,15 +794,11 @@ with tab3:
     st.markdown("---")
     st.subheader("🏢 Fournisseurs avec codes postaux correspondants")
 
-    # Utiliser comparer_codes_postaux pour obtenir les correspondances
+    # Récupérer les correspondances
     df_comp, stats = comparer_codes_postaux(df)
     
-    if df_comp is not None and not df_comp.empty:
-        # Extraire les correspondances
-        if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
-            df_correspondants = df_comp[df_comp["cp_client_clean"] == df_comp["cp_fourn_clean"]].copy()
-        else:
-            df_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() == df_comp["codigo_postal"].astype(str).str.strip()].copy()
+    if df_comp is not None and not df_comp.empty and "correspond" in df_comp.columns:
+        df_correspondants = df_comp[df_comp["correspond"] == True].copy()
         
         if not df_correspondants.empty:
             # Statistiques globales
@@ -855,11 +838,6 @@ with tab3:
                         "total_appels": "Total appels",
                         "taux_correspondance": "Taux de correspondance (%)"
                     }),
-                    column_config={
-                        "Nombre de correspondances": st.column_config.NumberColumn("Correspondances", format="%d"),
-                        "Total appels": st.column_config.NumberColumn("Total appels", format="%d"),
-                        "Taux de correspondance (%)": st.column_config.NumberColumn("Taux", format="%.1f%%")
-                    },
                     use_container_width=True,
                     hide_index=True
                 )
