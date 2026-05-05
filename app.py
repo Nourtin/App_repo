@@ -720,30 +720,69 @@ with tab3:
 
     st.subheader("🏢 Fiabilité par fournisseur")
     df_fiabilite = analyse_fiabilite_par_fournisseur(df)
-
-    
-    
-    
     if not df_fiabilite.empty:
         # Afficher directement sans renommage pour éviter les erreurs
         st.dataframe(_sanitize_for_display(df_fiabilite), use_container_width=True, hide_index=True)
     else:
         st.info("Données insuffisantes pour analyser la fiabilité par fournisseur")
 
-    st.markdown("---")
-    st.subheader("🔍 Codes postaux non correspondants")
-    df_non_corr = codes_postaux_correspondants(df)
+    # Sous-onglets pour les correspondances
+sub_tab_cor1, sub_tab_cor2 = st.tabs([
+    "✅ Correspondances",
+    "❌ Non-correspondances"
+])
 
-    if not df_non_corr.empty:
+with sub_tab_cor1:
+    st.subheader("Codes postaux correspondants")
+    
+    df_correspondants = codes_postaux_correspondants(df)
+    
+    if not df_correspondants.empty:
         cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-        cols_disponibles = [c for c in cols_afficher if c in df_non_corr.columns]
-        st.dataframe(_sanitize_for_display(df_non_corr[cols_disponibles].head(100)), use_container_width=True, hide_index=True)
-        csv = df_non_corr[cols_disponibles].to_csv(index=False).encode("utf-8")
-        st.download_button("📥 Exporter les non-correspondances", data=csv,
-                           file_name="non_correspondances_codes_postaux.csv", mime="text/csv")
+        cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+        
+        st.dataframe(
+            df_correspondants[cols_disponibles], 
+            use_container_width=True, 
+            hide_index=True
+        )
+        st.caption(f"Total: {len(df_correspondants)} lignes")
+        
+        csv = df_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 Exporter les correspondances", 
+            data=csv,
+            file_name="correspondances_codes_postaux.csv", 
+            mime="text/csv"
+        )
     else:
-        st.success("Tous les codes postaux disponibles correspondent !")
+        st.success("✅ Tous les codes postaux valides correspondent !")
 
+    with sub_tab_cor2:
+        st.subheader("Codes postaux non correspondants")
+        
+        df_non_correspondants = codes_postaux_non_correspondants(df)
+        
+        if not df_non_correspondants.empty:
+            cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+            cols_disponibles = [c for c in cols_afficher if c in df_non_correspondants.columns]
+            
+            st.dataframe(
+                df_non_correspondants[cols_disponibles], 
+                use_container_width=True, 
+                hide_index=True
+            )
+            st.caption(f"Total: {len(df_non_correspondants)} lignes")
+            
+            csv = df_non_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "📥 Exporter les non-correspondances", 
+                data=csv,
+                file_name="non_correspondances_codes_postaux.csv", 
+                mime="text/csv"
+            )
+        else:
+            st.success("✅ Aucune non-correspondance détectée !")
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
