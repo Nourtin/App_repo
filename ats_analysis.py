@@ -1535,6 +1535,7 @@ def render_ats_tab(api_key_input: str = None):
     if not all_files_s1:
         st.info("📂 Sélectionnez ou importez au moins un fichier ATS Serveur 1 pour commencer")
     else:
+        st.info(f"📄 {len(all_files_s1)} fichier(s) en cours de traitement...")
         all_parsed = []
         all_dfs    = []
         for f in all_files_s1:
@@ -1544,13 +1545,23 @@ def render_ats_tab(api_key_input: str = None):
                 all_parsed.append(parsed)
                 if not df_f.empty:
                     all_dfs.append(df_f)
+                else:
+                    st.caption(f"⚠️ {f['name']} : aucune donnée extraite (format non reconnu ?)")
             except Exception as e:
-                st.warning(f" Erreur lecture {f['name']} : {e}")
+                st.warning(f" Erreur parsing {f['name']} : {e}")
 
         df_combined = pd.concat(all_dfs, ignore_index=True) if all_dfs else pd.DataFrame()
 
         if df_combined.empty:
             st.warning(" Aucune donnée ATS exploitable dans les fichiers Serveur 1.")
+            with st.expander("🔍 Diagnostic", expanded=True):
+                st.write("Fichiers traités :", len(all_files_s1))
+                for f in all_files_s1:
+                    st.write(f"- **{f['name']}** : {len(f['content'])} caractères")
+                    # Aperçu des 200 premiers caractères
+                    preview = f['content'][:200].replace('
+', ' ↵ ')
+                    st.code(preview)
         else:
             with st.expander(" Aperçu des données parsées", expanded=True):
                 col1, col2, col3, col4 = st.columns(4)
