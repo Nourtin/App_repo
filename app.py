@@ -727,62 +727,108 @@ with tab3:
         st.info("Données insuffisantes pour analyser la fiabilité par fournisseur")
 
     # Sous-onglets pour les correspondances
-sub_tab_cor1, sub_tab_cor2 = st.tabs([
-    "✅ Correspondances",
-    "❌ Non-correspondances"
-])
-
-with sub_tab_cor1:
-    st.subheader("Codes postaux correspondants")
+    sub_tab_cor1, sub_tab_cor2 = st.tabs([
+        "✅ Correspondances",
+        "❌ Non-correspondances"
+    ])
     
-    df_correspondants = codes_postaux_correspondants(df)
-    
-    if not df_correspondants.empty:
-        cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-        cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+    with sub_tab_cor1:
+        st.subheader("Codes postaux correspondants")
         
-        st.dataframe(
-            df_correspondants[cols_disponibles], 
-            use_container_width=True, 
-            hide_index=True
-        )
-        st.caption(f"Total: {len(df_correspondants)} lignes")
+        df_correspondants = codes_postaux_correspondants(df)
         
-        csv = df_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "📥 Exporter les correspondances", 
-            data=csv,
-            file_name="correspondances_codes_postaux.csv", 
-            mime="text/csv"
-        )
-    else:
-        st.success("✅ Tous les codes postaux valides correspondent !")
-
-    with sub_tab_cor2:
-        st.subheader("Codes postaux non correspondants")
-        
-        df_non_correspondants = codes_postaux_non_correspondants(df)
-        
-        if not df_non_correspondants.empty:
+        if not df_correspondants.empty:
             cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-            cols_disponibles = [c for c in cols_afficher if c in df_non_correspondants.columns]
+            cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
             
             st.dataframe(
-                df_non_correspondants[cols_disponibles], 
+                df_correspondants[cols_disponibles], 
                 use_container_width=True, 
                 hide_index=True
             )
-            st.caption(f"Total: {len(df_non_correspondants)} lignes")
+            st.caption(f"Total: {len(df_correspondants)} lignes")
             
-            csv = df_non_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+            csv = df_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
             st.download_button(
-                "📥 Exporter les non-correspondances", 
+                "📥 Exporter les correspondances", 
                 data=csv,
-                file_name="non_correspondances_codes_postaux.csv", 
+                file_name="correspondances_codes_postaux.csv", 
                 mime="text/csv"
             )
         else:
-            st.success("✅ Aucune non-correspondance détectée !")
+            st.success("✅ Tous les codes postaux valides correspondent !")
+    
+        with sub_tab_cor2:
+            st.subheader("Codes postaux non correspondants")
+            
+            df_non_correspondants = codes_postaux_non_correspondants(df)
+            
+            if not df_non_correspondants.empty:
+                cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+                cols_disponibles = [c for c in cols_afficher if c in df_non_correspondants.columns]
+                
+                st.dataframe(
+                    df_non_correspondants[cols_disponibles], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+                st.caption(f"Total: {len(df_non_correspondants)} lignes")
+                
+                csv = df_non_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Exporter les non-correspondances", 
+                    data=csv,
+                    file_name="non_correspondances_codes_postaux.csv", 
+                    mime="text/csv"
+                )
+            else:
+                st.success("✅ Aucune non-correspondance détectée !")
+        # Dans tab3, après les statistiques générales, ajoutez :
+
+        st.markdown("---")
+        st.subheader("🏆 Classement des fournisseurs par qualité de correspondance")
+        
+        # Récupérer les correspondances
+        df_correspondants = codes_postaux_correspondants(df)
+        
+        if not df_correspondants.empty:
+            # Calculer les stats par fournisseur
+            stats_fournisseurs = df_correspondants.groupby("list_name").agg(
+                correspondances=("code_postal", "count")
+            ).reset_index()
+            
+            # Ajouter le total d'appels par fournisseur
+            total_par_fournisseur = df.groupby("list_name").size().reset_index(name="total_appels")
+            stats_fournisseurs = stats_fournisseurs.merge(total_par_fournisseur, on="list_name", how="left")
+            stats_fournisseurs["taux"] = (stats_fournisseurs["correspondances"] / stats_fournisseurs["total_appels"] * 100).round(1)
+            
+            # Trier par taux
+            stats_fournisseurs = stats_fournisseurs.sort_values("taux", ascending=False)
+            
+            # Afficher le classement
+            for idx, row in stats_fournisseurs.iterrows():
+                if row["taux"] >= 80:
+                    emoji = "🏆"
+                    color = "green"
+                elif row["taux"] >= 50:
+                    emoji = "👍"
+                    color = "orange"
+                else:
+                    emoji = "⚠️"
+                    color = "red"
+                
+                st.markdown(
+                    f"""
+                    <div style='padding: 10px; border-radius: 5px; margin-bottom: 10px; background-color: {color}10;'>
+                        <b>{emoji} {row['list_name']}</b><br>
+                        📊 {row['correspondances']:,} correspondances / {row['total_appels']:,} appels<br>
+                        📈 Taux: <b>{row['taux']}%</b>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        else:
+            st.info("Aucune correspondance de code postal trouvée")
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
