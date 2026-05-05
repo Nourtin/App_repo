@@ -734,7 +734,7 @@ with tab3:
     with sub_tab_cor1:
         st.subheader("Codes postaux correspondants")
         
-        df_correspondants = codes_postaux_correspondants(df)
+        df_correspondants = comparer_codes_postaux(df)
         
         if not df_correspondants.empty:
             cols_afficher = ["list_name", "code_postal", "codigo_postal"]
@@ -788,7 +788,7 @@ with tab3:
     st.subheader("🏢 Fournisseurs avec codes postaux correspondants")
 
     # Récupérer les codes postaux correspondants
-    df_correspondants = codes_postaux_correspondants(df)
+    df_correspondants = comparer_codes_postaux(df)
     
     if not df_correspondants.empty:
         # Statistiques globales
