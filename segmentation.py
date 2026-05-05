@@ -195,6 +195,8 @@ def calcul_taux_conversion(df: pd.DataFrame) -> pd.DataFrame:
             "nb_convertis": int(conv),
             "taux_conversion": taux,
         })
+    if not rows:
+        return pd.DataFrame(columns=["cluster_id","cluster_nom","couleur","tag","nb_contacts","nb_convertis","taux_conversion"])
     return pd.DataFrame(rows).sort_values("taux_conversion", ascending=False)
 
 
@@ -316,6 +318,43 @@ def render_segmentation_tab(df: pd.DataFrame):
 
     nb_non_classe = (df_cl["cluster_id"] == -1).sum()
     nb_classe     = (df_cl["cluster_id"] != -1).sum()
+
+    # ── Diagnostic si aucun cluster assigné ──
+    if nb_classe == 0:
+        st.warning(
+            "Aucun contact assigné aux clusters avec les règles actuelles. "
+            "Vérifiez que les valeurs de `tipo_vivienda` / `calefaccion` "
+            "correspondent aux mots-clés dans `CLUSTER_CONFIG`."
+        )
+        with st.expander("Diagnostic — valeurs détectées dans vos données", expanded=True):
+            for col in ["tipo_vivienda", "piso_casa", "calefaccion", "calefacción", "Edad", "superfici_vivienda"]:
+                if col in df.columns:
+                    vals = df[col].dropna().astype(str).str.lower().str.strip().unique()[:20]
+                    st.markdown(f"**`{col}`** : `{'` · `'.join(vals)}`")
+            st.info(
+                "Copiez les valeurs ci-dessus et mettez à jour les listes "
+                "`tipo_vivienda` et `calefaccion` dans `CLUSTER_CONFIG` "
+                "en haut de `segmentation.py`."
+            )
+
+        # Fallback : clustering par tranche d'âge seule
+        col_edad_fb = next((c for c in ["Edad", "edad"] if c in df_cl.columns), None)
+        if col_edad_fb:
+            st.info("Fallback actif : clusters basés sur l'âge uniquement.")
+            edad_num = pd.to_numeric(df_cl[col_edad_fb], errors="coerce")
+            tranches = [
+                (edad_num >= 55),
+                (edad_num.between(35, 54)),
+                (edad_num.between(40, 64)),
+                (edad_num < 35),
+            ]
+            for cfg, cond in zip(CLUSTER_CONFIG, tranches):
+                mask = cond & (df_cl["cluster_id"] == -1)
+                df_cl.loc[mask, "cluster_id"]  = cfg["id"]
+                df_cl.loc[mask, "cluster_nom"] = cfg["nom"]
+
+        nb_non_classe = (df_cl["cluster_id"] == -1).sum()
+        nb_classe     = (df_cl["cluster_id"] != -1).sum()
 
     # ── KPIs globaux ──
     taux_conv_global = None
