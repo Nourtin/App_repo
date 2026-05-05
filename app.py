@@ -471,9 +471,6 @@ with tab1:
         else:
             st.info("Colonne Timestamp absente.")
 
-# ══════════════════════════════════════════════
-# TAB 2 — PAR FOURNISSEUR (à conserver tel quel)
-# ══════════════════════════════════════════════
 
 # ══════════════════════════════════════════════
 # TAB 2 — PAR FOURNISSEUR
@@ -734,146 +731,175 @@ with tab3:
     with sub_tab_cor1:
         st.subheader("Codes postaux correspondants")
         
-        df_correspondants = comparer_codes_postaux(df)
+        # Utiliser comparer_codes_postaux pour obtenir les correspondances
+        df_comp, stats = comparer_codes_postaux(df)
         
-        if not df_correspondants.empty:
-            cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-            cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+        if df_comp is not None and not df_comp.empty:
+            # df_comp contient les données avec les colonnes cp_client_clean et cp_fourn_clean
+            # Filtrer les correspondances
+            if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
+                df_correspondants = df_comp[df_comp["cp_client_clean"] == df_comp["cp_fourn_clean"]].copy()
+            else:
+                # Fallback: utiliser les colonnes originales
+                df_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() == df_comp["codigo_postal"].astype(str).str.strip()].copy()
             
-            st.dataframe(
-                df_correspondants[cols_disponibles], 
-                use_container_width=True, 
-                hide_index=True
-            )
-            st.caption(f"Total: {len(df_correspondants)} lignes")
-            
-            csv = df_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "📥 Exporter les correspondances", 
-                data=csv,
-                file_name="correspondances_codes_postaux.csv", 
-                mime="text/csv"
-            )
+            if not df_correspondants.empty:
+                cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+                cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+                
+                st.dataframe(
+                    df_correspondants[cols_disponibles], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+                st.caption(f"Total: {len(df_correspondants)} lignes")
+                
+                csv = df_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Exporter les correspondances", 
+                    data=csv,
+                    file_name="correspondances_codes_postaux.csv", 
+                    mime="text/csv"
+                )
+            else:
+                st.success("✅ Tous les codes postaux valides correspondent !")
         else:
-            st.success("✅ Tous les codes postaux valides correspondent !")
+            st.info("Aucune donnée disponible pour les correspondances")
     
     with sub_tab_cor2:
         st.subheader("Codes postaux non correspondants")
         
-        df_non_correspondants = codes_postaux_non_correspondants(df)
+        # Utiliser comparer_codes_postaux pour obtenir les non-correspondances
+        df_comp, stats = comparer_codes_postaux(df)
         
-        if not df_non_correspondants.empty:
-            cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-            cols_disponibles = [c for c in cols_afficher if c in df_non_correspondants.columns]
+        if df_comp is not None and not df_comp.empty:
+            # Filtrer les non-correspondances
+            if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
+                df_non_correspondants = df_comp[df_comp["cp_client_clean"] != df_comp["cp_fourn_clean"]].copy()
+            else:
+                # Fallback: utiliser les colonnes originales
+                df_non_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() != df_comp["codigo_postal"].astype(str).str.strip()].copy()
             
-            st.dataframe(
-                df_non_correspondants[cols_disponibles], 
-                use_container_width=True, 
-                hide_index=True
-            )
-            st.caption(f"Total: {len(df_non_correspondants)} lignes")
-            
-            csv = df_non_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
-            st.download_button(
-                "📥 Exporter les non-correspondances", 
-                data=csv,
-                file_name="non_correspondances_codes_postaux.csv", 
-                mime="text/csv"
-            )
+            if not df_non_correspondants.empty:
+                cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+                cols_disponibles = [c for c in cols_afficher if c in df_non_correspondants.columns]
+                
+                st.dataframe(
+                    df_non_correspondants[cols_disponibles], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+                st.caption(f"Total: {len(df_non_correspondants)} lignes")
+                
+                csv = df_non_correspondants[cols_disponibles].to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Exporter les non-correspondances", 
+                    data=csv,
+                    file_name="non_correspondances_codes_postaux.csv", 
+                    mime="text/csv"
+                )
+            else:
+                st.success("✅ Aucune non-correspondance détectée !")
         else:
-            st.success("✅ Aucune non-correspondance détectée !")
+            st.info("Aucune donnée disponible pour les non-correspondances")
     
-    # SECTION FOURNISSEURS AVEC CORRESPONDANCES (en dehors des sous-onglets)
+    # SECTION FOURNISSEURS AVEC CORRESPONDANCES
     st.markdown("---")
     st.subheader("🏢 Fournisseurs avec codes postaux correspondants")
 
-    # Récupérer les codes postaux correspondants
-    df_correspondants = comparer_codes_postaux(df)
+    # Utiliser comparer_codes_postaux pour obtenir les correspondances
+    df_comp, stats = comparer_codes_postaux(df)
     
-    if not df_correspondants.empty:
-        # Statistiques globales
-        total_correspondances = len(df_correspondants)
-        nb_fournisseurs = df_correspondants["list_name"].nunique()
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.metric("Total correspondances", f"{total_correspondances:,}")
-        with col_b:
-            st.metric("Fournisseurs concernés", nb_fournisseurs)
-        
-        st.markdown("---")
-        
-        # Tableau par fournisseur
-        fournisseurs_correspondants = df_correspondants.groupby("list_name").size().reset_index(name="nb_correspondances")
-        fournisseurs_correspondants = fournisseurs_correspondants.sort_values("nb_correspondances", ascending=False)
-        
-        # Ajouter le taux de correspondance par rapport au total des appels du fournisseur
-        total_appels_par_fournisseur = df.groupby("list_name").size().reset_index(name="total_appels")
-        
-        fournisseurs_correspondants = fournisseurs_correspondants.merge(
-            total_appels_par_fournisseur, 
-            on="list_name", 
-            how="left"
-        )
-        fournisseurs_correspondants["taux_correspondance"] = (
-            fournisseurs_correspondants["nb_correspondances"] / 
-            fournisseurs_correspondants["total_appels"] * 100
-        ).round(1)
-        
-        st.dataframe(
-            fournisseurs_correspondants.rename(columns={
-                "list_name": "Fournisseur",
-                "nb_correspondances": "Nombre de correspondances",
-                "total_appels": "Total appels",
-                "taux_correspondance": "Taux de correspondance (%)"
-            }),
-            column_config={
-                "Nombre de correspondances": st.column_config.NumberColumn("Correspondances", format="%d"),
-                "Total appels": st.column_config.NumberColumn("Total appels", format="%d"),
-                "Taux de correspondance (%)": st.column_config.NumberColumn("Taux", format="%.1f%%")
-            },
-            use_container_width=True,
-            hide_index=True
-        )
-        
-        # Graphique - CORRIGÉ : maintenant il est bien placé
-        st.markdown("---")
-        
-        # Vérifier qu'il y a des données pour le graphique
-        if not fournisseurs_correspondants.empty and fournisseurs_correspondants["nb_correspondances"].sum() > 0:
-            fig = px.bar(
-                fournisseurs_correspondants,
-                x="nb_correspondances",
-                y="list_name",
-                orientation="h",
-                text="nb_correspondances",
-                title="Nombre de correspondances par fournisseur",
-                color="nb_correspondances",
-                color_continuous_scale="Greens"
-            )
-            fig.update_traces(textposition="outside")
-            fig.update_layout(
-                xaxis_title="Nombre de correspondances",
-                yaxis_title="Fournisseur",
-                height=400
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    if df_comp is not None and not df_comp.empty:
+        # Extraire les correspondances
+        if "cp_client_clean" in df_comp.columns and "cp_fourn_clean" in df_comp.columns:
+            df_correspondants = df_comp[df_comp["cp_client_clean"] == df_comp["cp_fourn_clean"]].copy()
         else:
-            st.info("Pas assez de données pour afficher le graphique")
+            df_correspondants = df_comp[df_comp["code_postal"].astype(str).str.strip() == df_comp["codigo_postal"].astype(str).str.strip()].copy()
         
-        # Détail des correspondances
-        with st.expander("📋 Voir le détail des codes postaux correspondants"):
-            cols_afficher = ["list_name", "code_postal", "codigo_postal"]
-            cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
-            st.dataframe(
-                df_correspondants[cols_disponibles].head(200),
-                use_container_width=True,
-                hide_index=True
-            )
+        if not df_correspondants.empty:
+            # Statistiques globales
+            total_correspondances = len(df_correspondants)
+            nb_fournisseurs = df_correspondants["list_name"].nunique() if "list_name" in df_correspondants.columns else 0
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("Total correspondances", f"{total_correspondances:,}")
+            with col_b:
+                st.metric("Fournisseurs concernés", nb_fournisseurs)
+            
+            st.markdown("---")
+            
+            if "list_name" in df_correspondants.columns:
+                # Tableau par fournisseur
+                fournisseurs_correspondants = df_correspondants.groupby("list_name").size().reset_index(name="nb_correspondances")
+                fournisseurs_correspondants = fournisseurs_correspondants.sort_values("nb_correspondances", ascending=False)
+                
+                # Ajouter le taux de correspondance par rapport au total des appels du fournisseur
+                total_appels_par_fournisseur = df.groupby("list_name").size().reset_index(name="total_appels")
+                
+                fournisseurs_correspondants = fournisseurs_correspondants.merge(
+                    total_appels_par_fournisseur, 
+                    on="list_name", 
+                    how="left"
+                )
+                fournisseurs_correspondants["taux_correspondance"] = (
+                    fournisseurs_correspondants["nb_correspondances"] / 
+                    fournisseurs_correspondants["total_appels"] * 100
+                ).round(1)
+                
+                st.dataframe(
+                    fournisseurs_correspondants.rename(columns={
+                        "list_name": "Fournisseur",
+                        "nb_correspondances": "Nombre de correspondances",
+                        "total_appels": "Total appels",
+                        "taux_correspondance": "Taux de correspondance (%)"
+                    }),
+                    column_config={
+                        "Nombre de correspondances": st.column_config.NumberColumn("Correspondances", format="%d"),
+                        "Total appels": st.column_config.NumberColumn("Total appels", format="%d"),
+                        "Taux de correspondance (%)": st.column_config.NumberColumn("Taux", format="%.1f%%")
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+                
+                # Graphique
+                if not fournisseurs_correspondants.empty and fournisseurs_correspondants["nb_correspondances"].sum() > 0:
+                    st.markdown("---")
+                    fig = px.bar(
+                        fournisseurs_correspondants,
+                        x="nb_correspondances",
+                        y="list_name",
+                        orientation="h",
+                        text="nb_correspondances",
+                        title="Nombre de correspondances par fournisseur",
+                        color="nb_correspondances",
+                        color_continuous_scale="Greens"
+                    )
+                    fig.update_traces(textposition="outside")
+                    fig.update_layout(
+                        xaxis_title="Nombre de correspondances",
+                        yaxis_title="Fournisseur",
+                        height=400
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Détail des correspondances
+                with st.expander("📋 Voir le détail des codes postaux correspondants"):
+                    cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+                    cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+                    st.dataframe(
+                        df_correspondants[cols_disponibles].head(200),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+            else:
+                st.info("Colonne 'list_name' non trouvée pour l'analyse par fournisseur")
+        else:
+            st.info("Aucun code postal correspondant trouvé")
     else:
-        st.info("Aucun code postal correspondant trouvé")
-        
-        
+        st.info("Données insuffisantes pour analyser les correspondances")
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
