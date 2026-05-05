@@ -145,10 +145,7 @@ with st.sidebar:
 # SIDEBAR — CONNEXION & FILTRES (VERSION CORRIGÉE)
 # ═══════════════════════════════════════════════════════════════════════════════════════════════════
 
-with st.sidebar:
-    st.title("📞 Call Center")
-    st.markdown("---")
-    
+with st.sidebar:    
     # Section de connexion Google Sheet
     st.subheader("🔗 Connexion Google Sheet")
     
