@@ -141,24 +141,6 @@ with st.sidebar:
     # URLs prédéfinies
     st.markdown("**📌 Choisissez une source :**")
 
-    # ═══════════════════════════════════════════════════════════════════════════════════════════════════
-# SIDEBAR — CONNEXION & FILTRES (VERSION CORRIGÉE)
-# ═══════════════════════════════════════════════════════════════════════════════════════════════════
-
-with st.sidebar:    
-    # Section de connexion Google Sheet
-    st.subheader("🔗 Connexion Google Sheet")
-    
-    with st.expander("📖 Comment obtenir l'URL ?"):
-        st.markdown("""
-        1. Ouvrez votre Google Sheet
-        2. Cliquez sur **Partager** (🔗 en haut à droite)
-        3. Dans **"Accès général"**, sélectionnez : **"Toute personne disposant du lien"**
-        4. Copiez le lien
-        5. Collez-le ci-dessous
-        """)
-    
-    # ========== SOURCES PRÉDÉFINIES ==========
     try:
         # Définir les URLs prédéfinies depuis les secrets
         urls_preset = {
