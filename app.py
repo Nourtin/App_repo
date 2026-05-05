@@ -32,6 +32,7 @@ from analyse import (
     comparer_codes_postaux,
     analyse_fiabilite_par_fournisseur,
     codes_postaux_non_correspondants,
+    codes_postaux_correspondants,
     analyse_par_type_logement,
     comparer_types_logement,
     classification_detaillee_par_type,
@@ -731,7 +732,7 @@ with tab3:
 
     st.markdown("---")
     st.subheader("🔍 Codes postaux non correspondants")
-    df_non_corr = codes_postaux_non_correspondants(df)
+    df_non_corr = codes_postaux_correspondants(df)
 
     if not df_non_corr.empty:
         cols_afficher = ["list_name", "code_postal", "codigo_postal"]
