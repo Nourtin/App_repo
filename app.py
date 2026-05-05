@@ -784,51 +784,83 @@ with tab3:
             else:
                 st.success("✅ Aucune non-correspondance détectée !")
         # Dans tab3, après les statistiques générales, ajoutez :
+        st.subheader("🏢 Fournisseurs avec codes postaux correspondants")
 
-        st.markdown("---")
-        st.subheader("🏆 Classement des fournisseurs par qualité de correspondance")
-        
-        # Récupérer les correspondances
+        # Récupérer les codes postaux correspondants
         df_correspondants = codes_postaux_correspondants(df)
         
         if not df_correspondants.empty:
-            # Calculer les stats par fournisseur
-            stats_fournisseurs = df_correspondants.groupby("list_name").agg(
-                correspondances=("code_postal", "count")
-            ).reset_index()
+            # Statistiques globales
+            total_correspondances = len(df_correspondants)
+            nb_fournisseurs = df_correspondants["list_name"].nunique()
             
-            # Ajouter le total d'appels par fournisseur
-            total_par_fournisseur = df.groupby("list_name").size().reset_index(name="total_appels")
-            stats_fournisseurs = stats_fournisseurs.merge(total_par_fournisseur, on="list_name", how="left")
-            stats_fournisseurs["taux"] = (stats_fournisseurs["correspondances"] / stats_fournisseurs["total_appels"] * 100).round(1)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total correspondances", f"{total_correspondances:,}")
+            with col2:
+                st.metric("Fournisseurs concernés", nb_fournisseurs)
             
-            # Trier par taux
-            stats_fournisseurs = stats_fournisseurs.sort_values("taux", ascending=False)
+            st.markdown("---")
             
-            # Afficher le classement
-            for idx, row in stats_fournisseurs.iterrows():
-                if row["taux"] >= 80:
-                    emoji = "🏆"
-                    color = "green"
-                elif row["taux"] >= 50:
-                    emoji = "👍"
-                    color = "orange"
-                else:
-                    emoji = "⚠️"
-                    color = "red"
-                
-                st.markdown(
-                    f"""
-                    <div style='padding: 10px; border-radius: 5px; margin-bottom: 10px; background-color: {color}10;'>
-                        <b>{emoji} {row['list_name']}</b><br>
-                        📊 {row['correspondances']:,} correspondances / {row['total_appels']:,} appels<br>
-                        📈 Taux: <b>{row['taux']}%</b>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+            # Tableau par fournisseur
+            fournisseurs_correspondants = df_correspondants.groupby("list_name").size().reset_index(name="nb_correspondances")
+            fournisseurs_correspondants = fournisseurs_correspondants.sort_values("nb_correspondances", ascending=False)
+            
+            # Ajouter le taux de correspondance par rapport au total des appels du fournisseur
+            total_appels_par_fournisseur = df.groupby("list_name").size().reset_index(name="total_appels")
+            
+            fournisseurs_correspondants = fournisseurs_correspondants.merge(
+                total_appels_par_fournisseur, 
+                on="list_name", 
+                how="left"
+            )
+            fournisseurs_correspondants["taux_correspondance"] = (
+                fournisseurs_correspondants["nb_correspondances"] / 
+                fournisseurs_correspondants["total_appels"] * 100
+            ).round(1)
+            
+            st.dataframe(
+                fournisseurs_correspondants.rename(columns={
+                    "list_name": "Fournisseur",
+                    "nb_correspondances": "Nombre de correspondances",
+                    "total_appels": "Total appels",
+                    "taux_correspondance": "Taux de correspondance (%)"
+                }),
+                column_config={
+                    "Nombre de correspondances": st.column_config.NumberColumn("Correspondances", format="%d"),
+                    "Total appels": st.column_config.NumberColumn("Total appels", format="%d"),
+                    "Taux de correspondance (%)": st.column_config.NumberColumn("Taux", format="%.1f%%")
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Graphique
+            st.markdown("---")
+            fig = px.bar(
+                fournisseurs_correspondants,
+                x="nb_correspondances",
+                y="list_name",
+                orientation="h",
+                text="nb_correspondances",
+                title="Nombre de correspondances par fournisseur",
+                color="nb_correspondances",
+                color_continuous_scale="Greens"
+            )
+            fig.update_traces(textposition="outside")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Détail des correspondances
+            with st.expander("📋 Voir le détail des codes postaux correspondants"):
+                cols_afficher = ["list_name", "code_postal", "codigo_postal"]
+                cols_disponibles = [c for c in cols_afficher if c in df_correspondants.columns]
+                st.dataframe(
+                    df_correspondants[cols_disponibles].head(200),
+                    use_container_width=True,
+                    hide_index=True
                 )
-        else:
-            st.info("Aucune correspondance de code postal trouvée")
+        
+        
 # ══════════════════════════════════════════════
 # TAB 4 — LOGEMENTS
 # ══════════════════════════════════════════════
