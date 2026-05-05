@@ -1559,8 +1559,7 @@ def render_ats_tab(api_key_input: str = None):
                 for f in all_files_s1:
                     st.write(f"- **{f['name']}** : {len(f['content'])} caractères")
                     # Aperçu des 200 premiers caractères
-                    preview = f["content"][:200].replace("
-", " ↵ ")
+                    preview = f["content"][:200].replace("\n", " ↵ ")
                     st.code(preview)
         else:
             with st.expander(" Aperçu des données parsées", expanded=True):
