@@ -606,7 +606,31 @@ def analyse_fiabilite_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
     df_resultat = pd.DataFrame(resultats)
     return df_resultat
 
-
+def codes_postaux_correspondants(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Retourne les lignes où les codes postaux client et fournisseur CORRESPONDENT.
+    - code_postal: donné par le fournisseur
+    - codigo_postal: donné par le client
+    """
+    # Vérifier que les deux colonnes existent
+    if "code_postal" not in df.columns or "codigo_postal" not in df.columns:
+        return pd.DataFrame()
+    
+    df_comp = df.copy()
+    
+    # Nettoyer les codes postaux (garder uniquement les chiffres)
+    df_comp["cp_fournisseur_clean"] = df_comp["code_postal"].astype(str).str.replace(r'\D', '', regex=True).str.strip()
+    df_comp["cp_client_clean"] = df_comp["codigo_postal"].astype(str).str.replace(r'\D', '', regex=True).str.strip()
+    
+    # Filtrer où les deux sont valides (non vides et non 'nan')
+    client_valide = (df_comp["cp_client_clean"] != "") & (df_comp["cp_client_clean"] != "nan")
+    fournisseur_valide = (df_comp["cp_fournisseur_clean"] != "") & (df_comp["cp_fournisseur_clean"] != "nan")
+    
+    # Filtrer où les deux sont valides et CORRESPONDENT
+    les_deux_valides = client_valide & fournisseur_valide
+    masque = les_deux_valides & (df_comp["cp_client_clean"] == df_comp["cp_fournisseur_clean"])
+    
+    return df_comp[masque].copy()
 def codes_postaux_non_correspondants(df: pd.DataFrame) -> pd.DataFrame:
     """
     Retourne les lignes où les codes postaux client et fournisseur ne correspondent pas.
