@@ -48,7 +48,7 @@ from analyse import (
     
 )
 from ats_analysis import render_ats_tab
-from segmentation import render_segmentation_tab
+
 
 PALETTE = px.colors.qualitative.Set2
 
@@ -321,7 +321,7 @@ if df.empty:
 # ONGLETS
 # ─────────────────────────────────────────────
 
-tab1, tab2, tab3, tab4, tab5, tab_wc, tab6, tab_ats, tab_seg = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab_wc, tab6, tab_ats= st.tabs([
     "📊 Analyse globale",
     "🏢 Par fournisseur",
     "📍 Codes postaux & Fiabilité",
@@ -330,7 +330,7 @@ tab1, tab2, tab3, tab4, tab5, tab_wc, tab6, tab_ats, tab_seg = st.tabs([
     "☁️ Nuage de mots",
     "📞 Origine des appels",
     "📋 Analyse des ATS par IA",
-    "🎯 Segmentation client",       # ← nouveau
+    
 ])
 
 # ══════════════════════════════════════════════
@@ -1530,5 +1530,4 @@ with tab6:
             mime="text/csv",
             use_container_width=True
         )
-with tab_seg:
-    render_segmentation_tab(df) 
+
