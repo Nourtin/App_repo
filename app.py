@@ -141,11 +141,14 @@ with st.sidebar:
     # URLs prédéfinies
     st.markdown("**📌 Choisissez une source :**")
 
-    urls_preset = {
-        "🔵 Source 1": st.secrets["source_1"],
-        "🟢 Source 2": "https://docs.google.com/spreadsheets/d/1Cg8BnTQwFlTkVpIY_FYgwTqwf-vFte3vim7U8wistDU/edit?usp=sharing",
-        "🟠 Source 3": "https://docs.google.com/spreadsheets/d/1z70_jYOOjy29xzWJOODYRoxU48yNakd9rcgsvp2obOE/edit?usp=sharing",
-    }
+    urls = {
+            "🔵 Source 1": st.secrets["sheets"]["source_1"],
+            "🟢 Source 2": st.secrets["sheets"]["source_2"],
+            "🟠 Source 3": st.secrets["sheets"]["source_3"],
+        }
+        return {k: v for k, v in urls.items() if v}
+    except (KeyError, FileNotFoundError):
+        pass
     
     col1, col2, col3 = st.columns(3)
     
