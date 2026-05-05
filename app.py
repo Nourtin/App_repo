@@ -141,35 +141,55 @@ with st.sidebar:
     # URLs prédéfinies
     st.markdown("**📌 Choisissez une source :**")
 
-    urls = {
+    # ═══════════════════════════════════════════════════════════════════════════════════════════════════
+# SIDEBAR — CONNEXION & FILTRES (VERSION CORRIGÉE)
+# ═══════════════════════════════════════════════════════════════════════════════════════════════════
+
+with st.sidebar:
+    st.title("📞 Call Center")
+    st.markdown("---")
+    
+    # Section de connexion Google Sheet
+    st.subheader("🔗 Connexion Google Sheet")
+    
+    with st.expander("📖 Comment obtenir l'URL ?"):
+        st.markdown("""
+        1. Ouvrez votre Google Sheet
+        2. Cliquez sur **Partager** (🔗 en haut à droite)
+        3. Dans **"Accès général"**, sélectionnez : **"Toute personne disposant du lien"**
+        4. Copiez le lien
+        5. Collez-le ci-dessous
+        """)
+    
+    # ========== SOURCES PRÉDÉFINIES ==========
+    try:
+        # Définir les URLs prédéfinies depuis les secrets
+        urls_preset = {
             "🔵 Source 1": st.secrets["sheets"]["source_1"],
             "🟢 Source 2": st.secrets["sheets"]["source_2"],
             "🟠 Source 3": st.secrets["sheets"]["source_3"],
         }
-        return {k: v for k, v in urls.items() if v}
-    except (KeyError, FileNotFoundError):
-        pass
+        # Filtrer les URLs vides
+        urls_preset = {k: v for k, v in urls_preset.items() if v}
+        
+        if urls_preset:
+            st.markdown("**📁 Sources rapides :**")
+            
+            # Afficher les boutons en colonnes adaptatives
+            cols = st.columns(min(len(urls_preset), 3))
+            for idx, (name, url) in enumerate(urls_preset.items()):
+                with cols[idx % 3]:
+                    if st.button(name, use_container_width=True, key=f"preset_{idx}"):
+                        st.session_state.sheet_url = url
+                        st.rerun()
+            
+            st.markdown("---")
+            st.markdown("**✏️ Ou entrez votre propre URL :**")
+    except (KeyError, FileNotFoundError, Exception):
+        # Si pas de secrets, afficher directement le champ URL
+        st.markdown("**✏️ Entrez l'URL du Google Sheet :**")
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔵 Source 1", use_container_width=True, key="preset_1"):
-            st.session_state.sheet_url = urls_preset["🔵 Source 1"]
-            st.rerun()
-    
-    with col2:
-        if st.button("🟢 Source 2", use_container_width=True, key="preset_2"):
-            st.session_state.sheet_url = urls_preset["🟢 Source 2"]
-            st.rerun()
-    
-    with col3:
-        if st.button("🟠 Source 3", use_container_width=True, key="preset_3"):
-            st.session_state.sheet_url = urls_preset["🟠 Source 3"]
-            st.rerun()
-    
-    st.markdown("---")
-    st.markdown("**✏️ Ou entrez votre propre URL :**")
-    
+    # ========== CHAMP URL PERSONNALISÉ ==========
     if "sheet_url" not in st.session_state:
         st.session_state.sheet_url = ""
     
@@ -177,30 +197,37 @@ with st.sidebar:
         "URL du Google Sheet",
         value=st.session_state.sheet_url,
         placeholder="https://docs.google.com/spreadsheets/d/...",
-        key="custom_url_input"
+        key="custom_url_input",
+        help="Collez l'URL complète de votre Google Sheet"
     )
 
-    if sheet_url and st.button("📂 Charger les feuilles", type="primary"):
+    # Mettre à jour la session
+    if sheet_url:
+        st.session_state.sheet_url = sheet_url
+
+    # ========== CHARGEMENT DES FEUILLES ==========
+    if sheet_url and st.button("📂 Charger les feuilles", type="primary", use_container_width=True):
         try:
             with st.spinner("Chargement du fichier..."):
                 st.session_state.fichier, st.session_state.sheets_list = list_sheets(sheet_url)
-            st.success(f"{len(st.session_state.sheets_list)} feuille(s) trouvée(s)")
+            st.success(f"✅ {len(st.session_state.sheets_list)} feuille(s) trouvée(s)")
         except Exception as exc:
-            st.error(f"Erreur de chargement : {exc}")
+            st.error(f"❌ Erreur de chargement : {exc}")
             st.session_state.fichier = None
             st.session_state.sheets_list = None
 
+    # ========== SÉLECTION DES FEUILLES ==========
     if st.session_state.sheets_list:
         st.markdown("---")
         st.subheader("📑 Sélection des feuilles")
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("Tout sélectionner"):
+            if st.button("✅ Tout sélectionner", use_container_width=True):
                 st.session_state.selected_sheets = st.session_state.sheets_list.copy()
                 st.rerun()
         with col2:
-            if st.button("Effacer tout"):
+            if st.button("❌ Effacer tout", use_container_width=True):
                 st.session_state.selected_sheets = []
                 st.rerun()
 
@@ -208,13 +235,14 @@ with st.sidebar:
             "Choisissez les feuilles à analyser",
             options=st.session_state.sheets_list,
             default=st.session_state.selected_sheets,
+            help="Sélectionnez une ou plusieurs feuilles. Les données seront combinées."
         )
         st.session_state.selected_sheets = selected_sheets
 
         if selected_sheets:
-            st.success(f"📊 {len(selected_sheets)} feuille(s) sélectionnée(s)")
+            st.info(f"📊 {len(selected_sheets)} feuille(s) sélectionnée(s)")
 
-            if st.button("🔄 Charger les données", type="primary"):
+            if st.button("🔄 Charger les données", type="primary", use_container_width=True):
                 try:
                     all_dfs = []
                     progress_bar = st.progress(0)
@@ -242,32 +270,35 @@ with st.sidebar:
                                 for name, d in zip(selected_sheets, all_dfs)
                             ],
                         }
-                        st.success(f"Données chargées : {len(st.session_state.df_raw):,} lignes")
+                        st.success(f"✅ Données chargées : {len(st.session_state.df_raw):,} lignes")
 
                         with st.expander("📋 Détail du chargement"):
                             st.write(f"**Total lignes :** {len(st.session_state.df_raw):,}")
                             st.write(f"**Colonnes :** {', '.join(st.session_state.df_raw.columns[:8])}")
+                            if len(st.session_state.df_raw.columns) > 8:
+                                st.write(f"... et {len(st.session_state.df_raw.columns) - 8} autres colonnes")
+                            st.write("**Détail par feuille :**")
                             for detail in st.session_state.stats_chargement["feuilles_details"]:
                                 st.write(f"- {detail['nom']} : {detail['lignes']:,} lignes")
                     else:
-                        st.error("Aucune donnée valide chargée")
+                        st.error("❌ Aucune donnée valide chargée")
 
                 except Exception as exc:
-                    st.error(f"Erreur : {exc}")
+                    st.error(f"❌ Erreur : {exc}")
         else:
-            st.warning("Veuillez sélectionner au moins une feuille")
+            st.warning("⚠️ Veuillez sélectionner au moins une feuille")
 
-    # Filtres (uniquement si données chargées)
+    # ========== FILTRES (uniquement si données chargées) ==========
     fourn_sel = "Tous"
     date_range = None
 
     if st.session_state.df_raw is not None:
         st.markdown("---")
-        st.subheader("Filtres")
+        st.subheader("🎯 Filtres")
         df_raw = st.session_state.df_raw
 
         if "list_name" in df_raw.columns:
-            fournisseurs = ["Tous"] + list(df_raw["list_name"].dropna().astype(str).unique())
+            fournisseurs = ["Tous"] + sorted(df_raw["list_name"].dropna().astype(str).unique().tolist())
             fourn_sel = st.selectbox("Fournisseur (list_name)", fournisseurs)
 
         if "Timestamp" in df_raw.columns:
@@ -282,7 +313,7 @@ with st.sidebar:
                 )
 
         st.markdown("---")
-        if st.button("🔄 Actualiser"):
+        if st.button("🔄 Actualiser les filtres", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
