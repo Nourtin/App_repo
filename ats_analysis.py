@@ -1490,41 +1490,47 @@ def render_ats_tab(api_key_input: str = None):
         st.caption(f"🖥️ Serveur 3 : {len(server3_files)} fichier(s)")
 
     st.markdown("---")
-    st.subheader("🖥️ Serveur 1 — Fichiers ATS")
+    st.subheader("🖥️ Serveur 1 — Sélectionner les fichiers")
 
-    all_files_s1 = []
-
+    selected_s1_paths = []
     if all_server1:
         noms_s1 = [os.path.basename(f) for f in all_server1]
         fichiers_sel_s1 = st.multiselect(
-            "Fichiers disponibles Serveur 1 (repo GitHub)",
+            "Fichiers disponibles Serveur 1",
             options=noms_s1,
-            default=[],
-            placeholder="Choisissez un ou plusieurs fichiers...",
+            default=[noms_s1[-1]] if noms_s1 else [],
             key="s1_multiselect",
         )
-        for f in all_server1:
-            if os.path.basename(f) in fichiers_sel_s1:
-                with open(f, "r", encoding="utf-8", errors="replace") as file:
-                    content = file.read()
-                    all_files_s1.append({"name": os.path.basename(f), "content": content})
+        selected_s1_paths = [f for f in all_server1 if os.path.basename(f) in fichiers_sel_s1]
         if fichiers_sel_s1:
-            st.success(f" {len(fichiers_sel_s1)} fichier(s) sélectionné(s)")
+            st.success(f" {len(fichiers_sel_s1)} fichier(s) Serveur 1 sélectionné(s)")
         else:
             st.warning(" Aucun fichier Serveur 1 sélectionné")
     else:
         st.info("📭 Aucun fichier Serveur 1 trouvé dans le repo")
 
-    uploaded_files = st.file_uploader(
-        "➕ Ajouter des fichiers ATS manuellement",
+    uploaded_s1 = st.file_uploader(
+        "➕ Ajouter des fichiers Serveur 1 manuellement",
         type=["csv", "txt"],
         accept_multiple_files=True,
-        key="ats_files",
+        key="s1_files_upload",
     )
-    if uploaded_files:
-        for f in uploaded_files:
-            content = f.read().decode("utf-8", errors="replace")
-            all_files_s1.append({"name": f.name, "content": content})
+    if uploaded_s1:
+        import tempfile
+        for uf in uploaded_s1:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+            tmp.write(uf.read())
+            tmp.close()
+            selected_s1_paths.append(tmp.name)
+
+    all_files_s1 = []
+    for path in selected_s1_paths:
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read()
+            all_files_s1.append({"name": os.path.basename(path), "content": content})
+        except Exception as e:
+            st.warning(f" Erreur lecture {os.path.basename(path)} : {e}")
 
     if not all_files_s1:
         st.info("📂 Sélectionnez ou importez au moins un fichier ATS Serveur 1 pour commencer")
