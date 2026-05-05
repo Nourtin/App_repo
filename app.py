@@ -1380,28 +1380,6 @@ with tab6:
             st.dataframe(df_croise, use_container_width=True)
     else:
         st.info("Données insuffisantes pour l'analyse croisée")
-    
-    st.markdown("---")
-    
-    # ========== Recommandations ==========
-    st.subheader("💡 Recommandations")
-    
-    # Identifier les serveurs problématiques
-    mauvais_serveurs = df_serveur[df_serveur["taux_qualification"] < 30]
-    bons_serveurs = df_serveur[df_serveur["taux_qualification"] > 60]
-    
-    if not mauvais_serveurs.empty:
-        st.warning("⚠️ **Serveurs à améliorer**")
-        for _, row in mauvais_serveurs.iterrows():
-            st.markdown(f"- **{row['serveur']}** : Taux qualification {row['taux_qualification']}% ({row['appels']} appels)")
-            st.markdown(f"  → Action: Analyser la qualité des connexions et former les équipes")
-    
-    if not bons_serveurs.empty:
-        st.success("✅ **Serveurs performants**")
-        for _, row in bons_serveurs.iterrows():
-            st.markdown(f"- **{row['serveur']}** : Taux qualification {row['taux_qualification']}%")
-            st.markdown(f"  → Action: Étudier les bonnes pratiques et les reproduire")
-    
     # Export
     st.markdown("---")
     col_exp1, col_exp2 = st.columns(2)
