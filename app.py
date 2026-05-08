@@ -1483,7 +1483,7 @@ with tab6:
         df_plot = df_plot.rename(columns={"serveur": "serveur"})  # Garder le nom correct
         
         df_plot = df_plot.melt(
-            id_vars=["serveur"],
+            id_vars=["phone"],
             var_name="Classification",
             value_name="nombre"
         )
