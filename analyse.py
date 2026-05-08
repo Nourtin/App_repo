@@ -1546,15 +1546,16 @@ def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
 
 def repartition_classification_par_serveur(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Répartition des classifications par serveur d'origine
+    Répartition des classifications par serveur d'origine (colonne phone)
     """
     if "phone" not in df.columns or "Classification" not in df.columns:
         return pd.DataFrame()
     
     df_clean = df.copy()
-    df_clean["serveur"] = df_clean["phone"].astype(str).str.strip()
-    df_clean["serveur"] = df_clean["serveur"].replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
-    df_clean = df_clean.dropna(subset=["serveur"])
+    # Utiliser directement la colonne phone comme identifiant
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean["phone"] = df_clean["phone"].replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
+    df_clean = df_clean.dropna(subset=["phone"])
     
     # Garder seulement les classifications utiles
     df_clean = df_clean[_est_utile(df_clean["Classification"])]
@@ -1562,32 +1563,33 @@ def repartition_classification_par_serveur(df: pd.DataFrame) -> pd.DataFrame:
     if df_clean.empty:
         return pd.DataFrame()
     
-    # Tableau croisé
-    cross = pd.crosstab(df_clean["serveur"], df_clean["Classification"])
+    # Tableau croisé avec 'phone' comme index
+    cross = pd.crosstab(df_clean["phone"], df_clean["Classification"])
+    cross.index.name = "phone"  # L'index s'appelle 'phone'
     cross["total"] = cross.sum(axis=1)
     
     return cross
 
-
 def performance_serveur_par_fournisseur(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Analyse croisée: Serveur × Fournisseur
+    Analyse croisée: Serveur (phone) × Fournisseur
     Retourne le nombre d'appels pour chaque combinaison
     """
     if "phone" not in df.columns or "list_name" not in df.columns:
         return pd.DataFrame()
     
     df_clean = df.copy()
-    df_clean["serveur"] = df_clean["phone"].astype(str).str.strip()
-    df_clean["serveur"] = df_clean["serveur"].replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
-    df_clean = df_clean.dropna(subset=["serveur"])
+    df_clean["phone"] = df_clean["phone"].astype(str).str.strip()
+    df_clean["phone"] = df_clean["phone"].replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
+    df_clean = df_clean.dropna(subset=["phone"])
     df_clean = df_clean.dropna(subset=["list_name"])
     
     if df_clean.empty:
         return pd.DataFrame()
     
     # Tableau croisé
-    cross = pd.crosstab(df_clean["serveur"], df_clean["list_name"])
+    cross = pd.crosstab(df_clean["phone"], df_clean["list_name"])
+    cross.index.name = "phone"
     cross["total_appels"] = cross.sum(axis=1)
     
     return cross
