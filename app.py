@@ -1461,7 +1461,7 @@ with tab6:
     
     fig = px.bar(
         df_compare,
-        x="phone",
+        x="serveur",
         y="taux",
         color="indicateur",
         barmode="group",
