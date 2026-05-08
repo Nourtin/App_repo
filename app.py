@@ -1472,17 +1472,18 @@ with tab6:
     st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
-    
-    # ========== Répartition des classifications par serveur ==========
     st.subheader("📋 Répartition des classifications par serveur")
-    
+
     df_classif_serveur = repartition_classification_par_serveur(df)
     
     if not df_classif_serveur.empty:
         # Graphique en barres empilées
+        # Le DataFrame a 'serveur' comme index après reset_index
         df_plot = df_classif_serveur.drop(columns=["total"]).reset_index()
+        df_plot = df_plot.rename(columns={"serveur": "serveur"})  # Garder le nom correct
+        
         df_plot = df_plot.melt(
-            id_vars=["phone"],
+            id_vars=["serveur"],
             var_name="Classification",
             value_name="nombre"
         )
@@ -1490,11 +1491,11 @@ with tab6:
         
         fig = px.bar(
             df_plot,
-            x="phone",
+            x="serveur",
             y="nombre",
             color="Classification",
             title="Répartition des classifications par serveur",
-            labels={"phone": "Serveur", "nombre": "Nombre d'appels"},
+            labels={"serveur": "Serveur", "nombre": "Nombre d'appels"},
             barmode="stack",
             color_discrete_sequence=PALETTE
         )
