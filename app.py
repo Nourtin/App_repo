@@ -1461,7 +1461,7 @@ with tab6:
     
     fig = px.bar(
         df_compare,
-        x="serveur",
+        x="phone",
         y="taux",
         color="indicateur",
         barmode="group",
@@ -1491,7 +1491,7 @@ with tab6:
         
         fig = px.bar(
             df_plot,
-            x="serveur",
+            x="phone",
             y="nombre",
             color="Classification",
             title="Répartition des classifications par serveur",
