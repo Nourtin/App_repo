@@ -1494,14 +1494,22 @@ def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
     if "phone" not in df.columns:
         return pd.DataFrame()
     
-    # Nettoyer la colonne phone (garder l'identifiant du serveur)
+    # Nettoyer la colonne phone - GARDER TOUTES LES VALEURS UNIQUES
     df_clean = df.copy()
+    
+    # Convertir en string et nettoyer, mais GARDER les valeurs originales
     df_clean["serveur"] = df_clean["phone"].astype(str).str.strip()
+    
+    # Remplacer les valeurs vides par NA, mais NE PAS filtrer les nombres
     df_clean["serveur"] = df_clean["serveur"].replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
     df_clean = df_clean.dropna(subset=["serveur"])
     
+    # IMPORTANT: Garder TOUS les serveurs, même ceux avec peu d'appels
     if df_clean.empty:
         return pd.DataFrame()
+    
+    # Afficher les valeurs uniques pour debug (optionnel)
+    # st.write("Valeurs uniques dans phone:", df_clean["serveur"].unique())
     
     resultats = []
     total_global = len(df_clean)
@@ -1530,7 +1538,7 @@ def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
             duree_moy = round(duree_moy, 1) if not pd.isna(duree_moy) else None
         
         resultats.append({
-            "serveur": serveur,
+            "serveur": serveur,  # Garder la valeur exacte (nombre ou texte)
             "appels": total,
             "part_du_total": part,
             "taux_classification": taux_classif,
@@ -1539,6 +1547,7 @@ def analyser_serveur_origine(df: pd.DataFrame) -> pd.DataFrame:
         })
     
     df_resultat = pd.DataFrame(resultats)
+    # Trier par volume d'appels décroissant
     df_resultat = df_resultat.sort_values("appels", ascending=False).reset_index(drop=True)
     
     return df_resultat
